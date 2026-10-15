@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+.vite
+.DS_Store
+npm-debug.log*
+
+# Local environment files: never commit secrets
+.env
+.env.*
+!.env.example
+
+# Vercel CLI project link
+.vercel

@@ -1,0 +1,184 @@
+/* ── Announcement ───────────────────────────────────────────── */
+.announcement { background: var(--forest); color: var(--white); font-size: var(--fs-xs); letter-spacing: 0.06em; }
+.announcement__inner { display: flex; align-items: center; justify-content: center; gap: var(--space-3); min-height: 36px; }
+.announcement p { margin: 0; text-align: center; }
+.announcement a { color: var(--white); text-decoration: underline; text-underline-offset: 3px; }
+.announcement a:hover { color: var(--champagne-200); }
+.announcement__sep { margin: 0 0.6rem; opacity: 0.5; }
+.announcement__nav { color: var(--white); opacity: 0.75; padding: 6px; border-radius: 50%; display: grid; place-items: center; }
+.announcement__nav:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
+.announcement :focus-visible { outline-color: var(--white); }
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(250, 247, 243, 0.96);
+  backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.header.is-scrolled { border-bottom-color: var(--taupe-300); box-shadow: var(--shadow-sm); }
+.header__inner { display: flex; align-items: center; gap: var(--space-5); height: var(--header-h); }
+
+/* ── Logo ───────────────────────────────────────────────────
+   The original logo PNG (2172 × 724, transparent) has transparent padding around the
+   wordmark (≈48% of its height on the left/right, ≈12% top/bottom). The image is always
+   rendered whole at height --logo-h with its native aspect ratio; negative margins only
+   offset that transparent padding so the visible wordmark lines up with the layout grid.
+   Visible wordmark ≈ 2.03 × --logo-h wide and 0.76 × --logo-h tall. */
+.logo {
+  --logo-h: 60px;
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+}
+.logo__img {
+  display: block;
+  height: var(--logo-h);
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  margin: calc(var(--logo-h) * -0.115) calc(var(--logo-h) * -0.48);
+  pointer-events: none;
+  user-select: none;
+  transition: opacity var(--t-fast);
+}
+a.logo:hover .logo__img { opacity: 0.78; }
+.logo:focus-visible { outline-offset: 6px; }
+.logo--header { --logo-h: 62px; }
+.logo--footer { --logo-h: 68px; }
+.logo--menu { --logo-h: 52px; }
+
+.header__nav { flex: 1; display: flex; justify-content: center; }
+.header__nav ul { display: flex; gap: clamp(1rem, 0.2rem + 1.6vw, 2.1rem); list-style: none; margin: 0; padding: 0; }
+.header__link {
+  position: relative;
+  display: inline-block;
+  padding: 0.5rem 0;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  color: var(--text);
+  white-space: nowrap;
+}
+.header__link::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0.2rem;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t) var(--ease);
+}
+.header__link:hover::after, .header__link.active::after { transform: scaleX(1); }
+.header__link.active { color: var(--forest); }
+.header__link--accent { color: var(--forest); font-weight: 500; }
+
+.header__actions { display: flex; align-items: center; gap: 0.15rem; margin-left: auto; }
+.header__menu-btn { display: none; margin-left: -10px; }
+.icon-btn__count {
+  position: absolute; top: 3px; right: 1px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px;
+  background: var(--champagne);
+  color: var(--black);
+  font-size: 0.625rem;
+  font-weight: 600;
+  display: grid; place-items: center;
+  line-height: 1;
+}
+.icon-btn__count--green { background: var(--forest); color: var(--white); }
+.icon-btn.is-active { background: var(--beige-100); color: var(--forest); }
+
+@media (max-width: 1080px) {
+  .header__nav { display: none; }
+  .header__menu-btn { display: inline-grid; }
+  .header__inner { gap: var(--space-2); }
+  .logo--header { --logo-h: 56px; margin-left: var(--space-1); }
+}
+@media (max-width: 480px) {
+  .header__hide-sm { display: none; }
+  .logo--header { --logo-h: 48px; }
+  .icon-btn { width: 38px; height: 38px; }
+}
+
+/* ── Mobile menu ────────────────────────────────────────────── */
+.mobile-menu__list { list-style: none; margin: 0; padding: 0; }
+.mobile-menu__link {
+  display: block;
+  padding: 0.85rem 0;
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--beige-200);
+}
+.mobile-menu__link.active, .mobile-menu__link--accent { color: var(--forest); }
+.mobile-menu__secondary { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ── Search dialog ──────────────────────────────────────────── */
+.search-dialog .drawer__body { padding-bottom: var(--space-6); }
+.search-dialog .drawer__head, .search-dialog .drawer__body { width: 100%; max-width: 860px; margin-inline: auto; }
+.search-dialog__form {
+  display: flex; align-items: center; gap: var(--space-3);
+  border-bottom: 1px solid var(--text);
+  padding: var(--space-2) 0;
+  color: var(--text-muted);
+}
+.search-dialog__input {
+  flex: 1; min-width: 0;
+  border: 0; background: transparent;
+  font-family: var(--font-serif);
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+  color: var(--text);
+  padding: 0.4rem 0;
+}
+.search-dialog__input:focus { outline: none; }
+.search-dialog__suggest { margin-top: var(--space-5); }
+.search-dialog__suggest ul { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; padding: 0; margin: var(--space-3) 0 0; }
+.search-dialog__results { margin-top: var(--space-4); }
+.search-dialog__results ul { list-style: none; padding: 0; margin: 0 0 var(--space-4); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-5); }
+.search-dialog__count { font-size: var(--fs-sm); }
+.search-result { display: grid; grid-template-columns: 56px 1fr; gap: var(--space-3); align-items: center; padding: var(--space-2); border-radius: var(--radius); }
+.search-result:hover { background: var(--beige-50); }
+.search-result .img-frame { border-radius: var(--radius-sm); }
+.search-result__name { display: block; color: var(--text); font-size: var(--fs-sm); }
+.search-result__meta { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
+@media (max-width: 600px) { .search-dialog__results ul { grid-template-columns: 1fr; } }
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.footer { background: var(--beige-100); margin-top: 0; color: var(--text-body); }
+.footer__grid {
+  display: grid;
+  grid-template-columns: 1.3fr repeat(3, 1fr) 1.6fr;
+  gap: var(--space-6);
+  padding-block: var(--space-8) var(--space-7);
+}
+.footer__brand p { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--space-3); }
+.footer__title {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-4);
+}
+.footer__col ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.55rem; font-size: var(--fs-sm); }
+.footer__col a { color: var(--text-body); }
+.footer__col a:hover { color: var(--forest); }
+.footer__news p { font-size: var(--fs-sm); color: var(--text-muted); }
+.footer__bottom { background: var(--taupe); color: var(--black); font-size: var(--fs-xs); }
+.footer__bottom-inner { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); min-height: 52px; flex-wrap: wrap; padding-block: var(--space-3); }
+.footer__bottom p { margin: 0; }
+.footer__bottom ul { display: flex; gap: var(--space-5); list-style: none; margin: 0; padding: 0; }
+.footer__bottom a:hover { color: var(--forest-700); text-decoration: underline; }
+
+@media (max-width: 1000px) {
+  .footer__grid { grid-template-columns: repeat(3, 1fr); }
+  .footer__brand, .footer__news { grid-column: span 3; }
+}
+@media (max-width: 600px) {
+  .footer__grid { grid-template-columns: 1fr 1fr; gap: var(--space-5); padding-block: var(--space-7) var(--space-6); }
+  .footer__brand, .footer__news { grid-column: span 2; }
+}

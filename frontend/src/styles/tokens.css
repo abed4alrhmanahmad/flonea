@@ -1,0 +1,77 @@
+/* FLONEA design tokens — Soft Luxury, Natural Comfort */
+:root {
+  /* Brand palette (exact) */
+  --white: #ffffff;
+  --champagne: #c9ab78;
+  --taupe: #b8aea4;
+  --beige: #ddc9ba;
+  --forest: #4d644f;
+  --black: #000000;
+
+  /* Derived tints & shades for surfaces and states */
+  --cream: #faf7f3;          /* page background — white warmed by beige */
+  --beige-50: #f6f0ea;
+  --beige-100: #efe5dc;
+  --beige-200: #e7d9cd;
+  --taupe-300: #d5cec7;      /* borders */
+  --taupe-600: #8a7f74;      /* muted icons */
+  --forest-700: #3e5240;     /* primary hover */
+  --forest-50: #edf1ec;
+  --champagne-200: #ecdfc8;
+
+  /* Text */
+  --text: #000000;
+  --text-body: #2b2724;
+  --text-muted: #5f5750;     /* ≥ 6.5:1 on cream */
+  --text-on-dark: #ffffff;
+
+  /* Feedback */
+  --danger: #a3382b;
+  --danger-bg: #fbeeec;
+  --warning: #8a5a12;
+  --warning-bg: #fbf3e4;
+  --success: var(--forest);
+  --success-bg: var(--forest-50);
+
+  /* Typography */
+  --font-serif: 'Cormorant Garamond', 'Times New Roman', Georgia, serif;
+  --font-sans: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.375rem;
+  --fs-xl: clamp(1.6rem, 1.2rem + 1.4vw, 2.25rem);
+  --fs-2xl: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+  --fs-hero: clamp(2.5rem, 1.6rem + 3.8vw, 4.75rem);
+
+  /* Spacing & layout */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 6rem;
+  --container: 1280px;
+  --gutter: clamp(1rem, 0.5rem + 2.5vw, 2.5rem);
+  --header-h: 72px;
+
+  --radius-sm: 2px;
+  --radius: 4px;
+  --radius-md: 6px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(60, 45, 30, 0.06);
+  --shadow: 0 8px 24px -12px rgba(60, 45, 30, 0.22);
+  --shadow-lg: 0 24px 60px -20px rgba(40, 30, 20, 0.35);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --t-fast: 160ms;
+  --t: 280ms;
+
+  --focus-ring: 0 0 0 2px var(--white), 0 0 0 4px var(--forest);
+}
