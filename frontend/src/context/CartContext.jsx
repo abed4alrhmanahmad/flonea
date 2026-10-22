@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { addLineToCart, removeLine, sanitizeCart, setLineQuantity } from '../lib/cart.js'
-import { calculateTotals, resolveCartLine } from '../lib/pricing.js'
+import { calculateTotals, getLineId, resolveCartLine } from '../lib/pricing.js'
 import { readStorage, STORAGE_KEYS, writeStorage } from '../lib/storage.js'
+import { useCatalog } from '../store/hooks.js'
 
 const CartContext = createContext(null)
 
@@ -37,12 +38,28 @@ export function CartProvider({ children }) {
   const remove = useCallback((lineId) => setLines((l) => removeLine(l, lineId)), [])
   const clear = useCallback(() => setLines([]), [])
 
-  const resolvedLines = useMemo(() => lines.map(resolveCartLine).filter(Boolean), [lines])
+  // Re-priced against the live catalog, so Admin changes (price, stock, availability) apply at once.
+  const catalog = useCatalog()
+  const { resolvedLines, unavailableLines } = useMemo(() => {
+    const resolved = []
+    const unavailable = []
+    for (const line of lines) {
+      const r = resolveCartLine(line, catalog)
+      // Sold-out lines can't be bought either, so they are listed with the unavailable ones.
+      if (r && r.quantity > 0) resolved.push(r)
+      else unavailable.push({ id: getLineId(line), line, resolved: r, name: r?.name ?? catalog.allById[line.productId]?.name ?? 'Custom Bedding Set' })
+    }
+    return { resolvedLines: resolved, unavailableLines: unavailable }
+  }, [lines, catalog])
   const totals = useMemo(() => calculateTotals(resolvedLines), [resolvedLines])
+  const removeUnavailable = useCallback(() => {
+    const ids = new Set(unavailableLines.map((u) => u.id))
+    setLines((l) => l.filter((line) => !ids.has(getLineId(line))))
+  }, [unavailableLines])
 
   const value = useMemo(
-    () => ({ lines: resolvedLines, totals, count: totals.itemCount, addLine, updateQuantity, remove, clear }),
-    [resolvedLines, totals, addLine, updateQuantity, remove, clear],
+    () => ({ lines: resolvedLines, unavailableLines, totals, count: totals.itemCount, addLine, updateQuantity, remove, removeUnavailable, clear }),
+    [resolvedLines, unavailableLines, totals, addLine, updateQuantity, remove, removeUnavailable, clear],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

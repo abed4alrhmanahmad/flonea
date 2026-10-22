@@ -1,14 +1,19 @@
 /**
- * FLONEA demo product catalog (frontend only — no database).
+ * FLONEA seed product catalog (frontend only — no database).
+ *
+ * This is the factory default the store starts from. Admin edits are saved in the browser
+ * (localStorage, see src/store/) on top of it, and "Reset catalog" in Admin → Settings returns here.
+ * src/store/seed.js converts each raw product into the editable per-product model, where every
+ * product owns its sizes, colours and materials.
  *
  * ── Raw product shape ─────────────────────────────────────────────────────────
  * id / slug         Unique identifiers (slug is used in /products/:slug).
  * name, category    Category is one of CATEGORIES in ./catalog.js.
  * tagline           One-line summary shown on cards & product page.
  * description       Long description (product page "Description" tab).
- * materials         Material ids offered for this product (see MATERIALS).
- * colors            Colour ids offered (see COLORS).
- * sizes             Size ids offered (see SIZES) — sizing differs per product type.
+ * materials         Material ids offered for this product (presets in MATERIALS).
+ * colors            Colour ids offered (presets in COLORS).
+ * sizes             Size ids offered (presets in SIZES) — sizing differs per product type.
  * pricing.sizes     Base price per size, in USD.
  * pricing.materials Optional surcharge per material, added to the size price.
  * unavailable       Combinations that are NOT produced. Each rule is a partial match,
@@ -20,18 +25,16 @@
  * bundle            (Bedding sets only) { components: [{ productId, quantity }], discountPercent }.
  *                   Set variants, prices and stock are derived from the components — a set variant
  *                   only exists when every component variant exists, and its price is the sum of
- *                   component prices minus the configured discount.
+ *                   component prices minus the configured discount. (Custom sets from Build a Set
+ *                   never get a discount.)
  * specs / care      Product information shown in the product page tabs.
  * relatedProducts   Product ids shown under "You may also like".
  * flags             featured, bestSeller, isNew, createdAt (used for "Newest" sort).
  * rating            Demo rating data — clearly labelled as sample content in the UI.
  *
- * `PRODUCTS` (exported below) is the processed catalog: each product gains
- * `variants`, `inventory`, `availableMaterials`, `availableColors`, `availableSizes`,
- * `priceRange` and `searchText`.
+ * Pillows & Pillowcases: every product in the pillows / pillowcases categories is ONE purchasable
+ * item (e.g. a pillowcase pair, or a pillow insert). It is never split into separately priced parts.
  */
-import { buildCatalog } from '../lib/variants.js'
-
 const DEFAULT_CARE = [
   'Machine wash cold or warm (max. 40°C) on a gentle cycle.',
   'Use a mild, fragrance-free detergent; avoid bleach and fabric softener.',
@@ -728,10 +731,4 @@ const RAW_PRODUCTS = [
   },
 ]
 
-export const PRODUCTS = buildCatalog(RAW_PRODUCTS)
-
-export const PRODUCTS_BY_ID = Object.fromEntries(PRODUCTS.map((p) => [p.id, p]))
-export const PRODUCTS_BY_SLUG = Object.fromEntries(PRODUCTS.map((p) => [p.slug, p]))
-
-export const getProductById = (id) => PRODUCTS_BY_ID[id] ?? null
-export const getProductBySlug = (slug) => PRODUCTS_BY_SLUG[slug] ?? null
+export const SEED_PRODUCTS = RAW_PRODUCTS

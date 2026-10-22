@@ -1,14 +1,16 @@
 import { Link, useParams } from 'react-router-dom'
 import Breadcrumbs from '../components/ui/Breadcrumbs.jsx'
 import Accordion, { AccordionItem } from '../components/ui/Accordion.jsx'
-import { HELP_PAGES } from '../data/content.js'
+import { HELP_TOPICS, getHelpPage } from '../lib/helpContent.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js'
+import { useSettings } from '../store/hooks.js'
 import NotFoundPage from './NotFoundPage.jsx'
 import '../styles/pages.css'
 
 export default function HelpPage() {
   const { topic } = useParams()
-  const page = HELP_PAGES[topic]
+  useSettings() // re-render when shipping or contact settings change (some sections are generated from them)
+  const page = getHelpPage(topic)
   useDocumentTitle(page?.title ?? 'Help')
   if (!page) return <NotFoundPage />
 
@@ -22,10 +24,10 @@ export default function HelpPage() {
       <div className="help__layout">
         <nav className="help__nav" aria-label="Help topics">
           <ul role="list">
-            {Object.entries(HELP_PAGES).map(([id, p]) => (
+            {HELP_TOPICS.map((id) => (
               <li key={id}>
                 <Link to={`/help/${id}`} className={id === topic ? 'is-active' : ''} aria-current={id === topic ? 'page' : undefined}>
-                  {p.title}
+                  {getHelpPage(id).title}
                 </Link>
               </li>
             ))}

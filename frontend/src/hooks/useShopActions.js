@@ -22,7 +22,7 @@ export function useShopActions() {
       } else {
         notify({
           title: `${product.name} added to cart`,
-          message: `${describeSelection(sel).join(' · ')}${result.capped ? ` — limited to ${result.added} by available stock` : ''}`,
+          message: `${describeSelection(product, sel).join(' · ')}${result.capped ? ` — limited to ${result.added} by available stock` : ''}`,
           action: { label: 'View cart', to: '/cart' },
         })
       }

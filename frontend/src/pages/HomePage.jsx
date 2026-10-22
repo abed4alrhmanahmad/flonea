@@ -1,143 +1,113 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Feather, Leaf, Quote, WashingMachine, Wind } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Feather, Heart, Leaf, Moon, Quote, Sparkles, Sun, WashingMachine, Wind } from 'lucide-react'
 import Img from '../components/ui/Img.jsx'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import NewsletterForm from '../components/ui/NewsletterForm.jsx'
 import Rating from '../components/ui/Rating.jsx'
-import { PRODUCTS } from '../data/products.js'
-import { COLORS, COLLECTIONS } from '../data/catalog.js'
-import { BENEFITS, SAMPLE_REVIEWS } from '../data/content.js'
-import { SET_BUILDER } from '../data/setBuilder.js'
+import { useCatalog, useContent } from '../store/hooks.js'
+import { safePath } from '../lib/links.js'
+import { orderedByFlag } from '../lib/merchandising.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js'
 import '../styles/home.css'
 
-const BENEFIT_ICONS = { Leaf, Wind, Feather, WashingMachine }
+const BENEFIT_ICONS = { Leaf, Wind, Feather, WashingMachine, Sparkles, Heart, Moon, Sun }
 
-const SLIDES = [
-  {
-    image: 'hero',
-    eyebrow: 'Skin friendly bedding',
-    title: ['Comfort Your Skin.', 'Elevate Your Sleep.'],
-    text: 'Premium bedding and pillow collections in carefully selected natural fabrics, made with sensitive skin in mind.',
-    primary: { to: '/shop', label: 'Shop Bedding' },
-    secondary: { to: '/collections/bedding-sets', label: 'Explore Sets' },
-  },
-  {
-    image: 'sageHeadboard',
-    eyebrow: 'Bedding Set Builder',
-    title: ['Create Your', 'Perfect Set.'],
-    text: 'Match your duvet cover, pillowcases and pillows in one fabric and colour — and save on the full set.',
-    primary: { to: '/bedding-sets/builder', label: 'Build a Set' },
-    secondary: { to: '/collections/bedding-sets', label: 'Ready-made Sets' },
-  },
-  {
-    image: 'goldSilk',
-    eyebrow: 'New arrivals',
-    title: ['Quietly Luminous.', 'Softly Silk.'],
-    text: 'Our new Silk Blend Duvet Cover and Mulberry Silk Pillowcases, in Champagne, Beige and White.',
-    primary: { to: '/products/silk-blend-duvet-cover', label: 'Discover Silk' },
-    secondary: { to: '/shop?sort=newest', label: 'All New Arrivals' },
-  },
-]
-
-function Hero() {
+function Hero({ slides }) {
   const [index, setIndex] = useState(0)
-  const go = (i) => setIndex((i + SLIDES.length) % SLIDES.length)
+  const current = index % slides.length
+  const go = (i) => setIndex((i + slides.length) % slides.length)
   return (
     <section className="hero" aria-roledescription="carousel" aria-label="Featured">
-      {SLIDES.map((slide, i) => (
+      {slides.map((slide, i) => (
         <div
-          key={slide.image}
-          className={`hero__slide ${i === index ? 'is-active' : ''}`}
+          key={slide.id}
+          className={`hero__slide ${i === current ? 'is-active' : ''}`}
           role="group"
           aria-roledescription="slide"
-          aria-label={`${i + 1} of ${SLIDES.length}`}
-          aria-hidden={i !== index}
-          inert={i !== index ? true : undefined}
+          aria-label={`${i + 1} of ${slides.length}`}
+          aria-hidden={i !== current}
+          inert={i !== current ? true : undefined}
         >
-          <Img name={slide.image} sizes="100vw" priority={i === 0} className="hero__img" />
+          <Img name={slide.image} alt="" sizes="100vw" priority={i === 0} className="hero__img" />
           <div className="hero__overlay" />
           <div className="container hero__content">
-            <p className="eyebrow eyebrow--light">{slide.eyebrow}</p>
+            {slide.eyebrow && <p className="eyebrow eyebrow--light">{slide.eyebrow}</p>}
             {i === 0 ? (
               <h1 className="hero__title">
-                {slide.title[0]} <br />
-                {slide.title[1]}
+                {slide.title1} <br />
+                {slide.title2}
               </h1>
             ) : (
               <h2 className="hero__title">
-                {slide.title[0]} <br />
-                {slide.title[1]}
+                {slide.title1} <br />
+                {slide.title2}
               </h2>
             )}
-            <p className="hero__text">{slide.text}</p>
+            {slide.text && <p className="hero__text">{slide.text}</p>}
             <div className="hero__ctas">
-              <Link to={slide.primary.to} className="btn">
-                {slide.primary.label}
-              </Link>
-              <Link to={slide.secondary.to} className="btn btn--ghost-light">
-                {slide.secondary.label}
-              </Link>
+              {slide.primaryLabel && (
+                <Link to={safePath(slide.primaryTo)} className="btn">
+                  {slide.primaryLabel}
+                </Link>
+              )}
+              {slide.secondaryLabel && (
+                <Link to={safePath(slide.secondaryTo)} className="btn btn--ghost-light">
+                  {slide.secondaryLabel}
+                </Link>
+              )}
             </div>
           </div>
         </div>
       ))}
-      <div className="hero__controls">
-        <button type="button" className="hero__arrow" onClick={() => go(index - 1)} aria-label="Previous slide">
-          <ChevronLeft size={18} />
-        </button>
-        <div className="hero__dots">
-          {SLIDES.map((s, i) => (
-            <button
-              key={s.image}
-              type="button"
-              className={`hero__dot ${i === index ? 'is-active' : ''}`}
-              aria-label={`Show slide ${i + 1}`}
-              aria-current={i === index}
-              onClick={() => go(i)}
-            />
-          ))}
+      {slides.length > 1 && (
+        <div className="hero__controls">
+          <button type="button" className="hero__arrow" onClick={() => go(current - 1)} aria-label="Previous slide">
+            <ChevronLeft size={18} />
+          </button>
+          <div className="hero__dots">
+            {slides.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`hero__dot ${i === current ? 'is-active' : ''}`}
+                aria-label={`Show slide ${i + 1}`}
+                aria-current={i === current}
+                onClick={() => go(i)}
+              />
+            ))}
+          </div>
+          <button type="button" className="hero__arrow" onClick={() => go(current + 1)} aria-label="Next slide">
+            <ChevronRight size={18} />
+          </button>
         </div>
-        <button type="button" className="hero__arrow" onClick={() => go(index + 1)} aria-label="Next slide">
-          <ChevronRight size={18} />
-        </button>
-      </div>
+      )}
     </section>
   )
 }
 
-const CATEGORY_CARDS = [
-  { ...COLLECTIONS['duvet-covers'], name: 'Duvet Covers', blurb: 'Soft & breathable', image: 'duvetSage1' },
-  { ...COLLECTIONS.pillows, name: 'Pillows', blurb: 'Supportive & gentle', image: 'pillowPair' },
-  { ...COLLECTIONS['bedding-sets'], name: 'Bedding Sets', blurb: 'Complete your sleep space', image: 'duvetWhite3' },
-]
-
-const TABS = [
-  { id: 'best', label: 'Best Sellers', filter: (p) => p.bestSeller, link: '/shop' },
-  { id: 'new', label: 'New Arrivals', filter: (p) => p.isNew, link: '/shop?sort=newest' },
-  { id: 'featured', label: 'Featured', filter: (p) => p.featured, link: '/shop' },
-]
-
-function PopularCollections() {
-  const [tab, setTab] = useState('best')
-  const active = TABS.find((t) => t.id === tab)
-  const products = useMemo(() => PRODUCTS.filter(active.filter).slice(0, 4), [active])
+function PopularCollections({ section, products }) {
+  const tabs = section.tabs.filter((t) => t.enabled)
+  const [tab, setTab] = useState(tabs[0]?.id)
+  const active = tabs.find((t) => t.id === tab) ?? tabs[0]
+  const limit = Math.min(Math.max(1, section.limit || 4), 12)
+  const shown = active ? orderedByFlag(products, active.flag, active.order).slice(0, limit) : []
+  if (!active) return null
   return (
     <section className="section" aria-labelledby="popular-title">
       <div className="container">
         <div className="section-head">
           <div>
-            <h2 id="popular-title">Popular Collections</h2>
+            <h2 id="popular-title">{section.heading}</h2>
             <div className="text-tabs" role="tablist" aria-label="Product groups">
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   role="tab"
-                  aria-selected={tab === t.id}
+                  aria-selected={active.id === t.id}
                   aria-controls="popular-panel"
-                  className={`text-tabs__tab ${tab === t.id ? 'is-active' : ''}`}
+                  className={`text-tabs__tab ${active.id === t.id ? 'is-active' : ''}`}
                   onClick={() => setTab(t.id)}
                 >
                   {t.label}
@@ -145,12 +115,12 @@ function PopularCollections() {
               ))}
             </div>
           </div>
-          <Link to={active.link} className="link-arrow">
+          <Link to={safePath(active.link, '/shop')} className="link-arrow">
             View All <ArrowRight size={14} />
           </Link>
         </div>
         <div id="popular-panel" role="tabpanel" aria-label={active.label}>
-          <ProductGrid products={products} />
+          {shown.length ? <ProductGrid products={shown} /> : <p className="muted">New pieces are on their way.</p>}
         </div>
       </div>
     </section>
@@ -159,162 +129,189 @@ function PopularCollections() {
 
 export default function HomePage() {
   useDocumentTitle(null)
-  const builderDiscount = SET_BUILDER.fullSet.discountPercent
+  const { home } = useContent()
+  const { products, collectionsById } = useCatalog()
+  const slides = home.hero.slides.filter((s) => s.enabled)
+  const cards = home.categories.cards.filter((c) => c.enabled && collectionsById[c.collectionId]?.enabled)
+  const chips = home.colors.chips.filter((c) => c.enabled && c.colorId)
+  const reviews = home.testimonials.items.filter((r) => r.enabled && r.text.trim())
+
   return (
     <>
-      <Hero />
+      {home.hero.enabled && slides.length > 0 && <Hero slides={slides} />}
 
-      <section className="section" aria-labelledby="cat-title">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2 id="cat-title">Shop by Category</h2>
-              <p>Find your perfect comfort.</p>
+      {home.categories.enabled && cards.length > 0 && (
+        <section className="section" aria-labelledby="cat-title">
+          <div className="container">
+            <div className="section-head">
+              <div>
+                <h2 id="cat-title">{home.categories.heading}</h2>
+                {home.categories.subheading && <p>{home.categories.subheading}</p>}
+              </div>
             </div>
-          </div>
-          <ul className="category-grid" role="list">
-            {CATEGORY_CARDS.map((c) => (
-              <li key={c.id}>
-                <Link to={`/collections/${c.id}`} className="category-card">
-                  <Img name={c.image} alt="" ratio="4 / 3" sizes="(max-width: 700px) 100vw, 33vw" />
-                  <span className="category-card__body">
-                    <span className="category-card__name">{c.name}</span>
-                    <span className="category-card__blurb">{c.blurb}</span>
-                  </span>
-                  <ArrowRight size={16} className="category-card__arrow" aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <PopularCollections />
-
-      <section className="materials-band" aria-labelledby="materials-title">
-        <Img name="creamLinen" alt="" sizes="100vw" className="materials-band__bg" />
-        <div className="container materials-band__inner">
-          <h2 id="materials-title">
-            Thoughtfully Selected Materials <br />
-            for Sensitive Skin
-          </h2>
-          <ul className="benefits" role="list">
-            {BENEFITS.map((b) => {
-              const Icon = BENEFIT_ICONS[b.icon]
-              return (
-                <li key={b.title} className="benefit">
-                  <span className="benefit__icon" aria-hidden="true">
-                    <Icon size={22} strokeWidth={1.4} />
-                  </span>
-                  <h3>{b.title}</h3>
-                  <p>{b.text}</p>
+            <ul className="category-grid" role="list">
+              {cards.map((c) => (
+                <li key={c.id}>
+                  <Link to={`/collections/${c.collectionId}`} className="category-card">
+                    <Img name={c.image || collectionsById[c.collectionId].image} alt="" ratio="4 / 3" sizes="(max-width: 700px) 100vw, 33vw" />
+                    <span className="category-card__body">
+                      <span className="category-card__name">{c.name || collectionsById[c.collectionId].title}</span>
+                      <span className="category-card__blurb">{c.blurb}</span>
+                    </span>
+                    <ArrowRight size={16} className="category-card__arrow" aria-hidden="true" />
+                  </Link>
                 </li>
-              )
-            })}
-          </ul>
-        </div>
-      </section>
-
-      <section className="section" aria-labelledby="color-title">
-        <div className="container">
-          <div className="section-head">
-            <h2 id="color-title">Shop by Color</h2>
-            <Link to="/shop" className="link-arrow">
-              View All Colors <ArrowRight size={14} />
-            </Link>
-          </div>
-          <ul className="color-row" role="list">
-            {Object.values(COLORS).map((c) => (
-              <li key={c.id}>
-                <Link to={`/shop?color=${c.id}`} className="color-chip">
-                  <span className="color-chip__dot" style={{ '--swatch': c.hex }} aria-hidden="true" />
-                  <span>{c.name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section className="section section--beige" aria-labelledby="builder-title">
-        <div className="container builder-promo">
-          <div className="builder-promo__media">
-            <Img name="duvetSage2" alt="" ratio="4 / 3" sizes="(max-width: 900px) 100vw, 50vw" />
-          </div>
-          <div className="builder-promo__text">
-            <p className="eyebrow">Bedding Set Builder</p>
-            <h2 id="builder-title">Create Your Perfect Set</h2>
-            <p>
-              Choose your bed size, fabric and colour once — we&apos;ll match the duvet cover, pillowcases and pillows for you. Build a full set
-              (duvet cover + pillowcases) and save {builderDiscount}%, or pick individual items at their regular price.
-            </p>
-            <ul className="tick-list" role="list">
-              <li>Thoughtfully matched pieces</li>
-              <li>{builderDiscount}% saving on full sets</li>
-              <li>Only compatible sizes &amp; colours offered</li>
+              ))}
             </ul>
-            <Link to="/bedding-sets/builder" className="btn">
-              Start Building
-            </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="section" aria-labelledby="story-title">
-        <div className="container story">
-          <Img name="sleeping" alt="Woman resting on soft neutral pillows" ratio="16 / 11" sizes="(max-width: 900px) 100vw, 50vw" className="story__img" />
-          <div className="story__text">
-            <h2 id="story-title">
-              Better Materials. <br />
-              Softer on Skin. Calmer Sleep.
+      {home.popular.enabled && <PopularCollections section={home.popular} products={products} />}
+
+      {home.materials.enabled && (
+        <section className="materials-band" aria-labelledby="materials-title">
+          <Img name={home.materials.image} alt="" sizes="100vw" className="materials-band__bg" />
+          <div className="container materials-band__inner">
+            <h2 id="materials-title">
+              {home.materials.heading1} <br />
+              {home.materials.heading2}
             </h2>
-            <p>
-              Every FLONEA piece starts with the fabric. We choose smooth, breathable weaves — organic cotton, stonewashed linen, bamboo
-              lyocell and mulberry silk — and finish them softly, so your bed feels calm from the very first night.
-            </p>
-            <Link to="/about" className="btn btn--outline">
-              Learn More
-            </Link>
+            <ul className="benefits" role="list">
+              {home.materials.benefits.map((b) => {
+                const Icon = BENEFIT_ICONS[b.icon] ?? Leaf
+                return (
+                  <li key={b.id} className="benefit">
+                    <span className="benefit__icon" aria-hidden="true">
+                      <Icon size={22} strokeWidth={1.4} />
+                    </span>
+                    <h3>{b.title}</h3>
+                    <p>{b.text}</p>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="section section--beige" aria-labelledby="reviews-title">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2 id="reviews-title">Kind Words</h2>
-              <p>Sample reviews shown for demonstration purposes.</p>
+      {home.colors.enabled && chips.length > 0 && (
+        <section className="section" aria-labelledby="color-title">
+          <div className="container">
+            <div className="section-head">
+              <h2 id="color-title">{home.colors.heading}</h2>
+              {home.colors.linkLabel && (
+                <Link to="/shop" className="link-arrow">
+                  {home.colors.linkLabel} <ArrowRight size={14} />
+                </Link>
+              )}
+            </div>
+            <ul className="color-row" role="list">
+              {chips.map((c) => {
+                const base = c.collectionId && collectionsById[c.collectionId]?.enabled ? `/collections/${c.collectionId}` : '/shop'
+                return (
+                  <li key={c.id}>
+                    <Link to={`${base}?color=${encodeURIComponent(c.colorId)}`} className="color-chip">
+                      <span className="color-chip__dot" style={{ '--swatch': c.hex }} aria-hidden="true" />
+                      <span>{c.name}</span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {home.builder.enabled && (
+        <section className="section section--beige" aria-labelledby="builder-title">
+          <div className="container builder-promo">
+            <div className="builder-promo__media">
+              <Img name={home.builder.image} alt="" ratio="4 / 3" sizes="(max-width: 900px) 100vw, 50vw" />
+            </div>
+            <div className="builder-promo__text">
+              {home.builder.eyebrow && <p className="eyebrow">{home.builder.eyebrow}</p>}
+              <h2 id="builder-title">{home.builder.heading}</h2>
+              <p>{home.builder.text}</p>
+              {home.builder.bullets.some((b) => b.trim()) && (
+                <ul className="tick-list" role="list">
+                  {home.builder.bullets
+                    .filter((b) => b.trim())
+                    .map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                </ul>
+              )}
+              <Link to="/bedding-sets/builder" className="btn">
+                {home.builder.buttonLabel || 'Start Building'}
+              </Link>
             </div>
           </div>
-          <ul className="reviews" role="list">
-            {SAMPLE_REVIEWS.map((r) => (
-              <li key={r.id} className="review">
-                <Quote size={22} className="review__quote" aria-hidden="true" />
-                <Rating value={r.rating} showLabel={false} />
-                <blockquote>
-                  <p>{r.text}</p>
-                </blockquote>
-                <p className="review__by">
-                  <strong>{r.name}</strong>, {r.location}
-                  <span className="review__product">on {r.product}</span>
-                </p>
-                <span className="badge badge--outline review__demo">Sample review</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="section newsletter-band" aria-labelledby="news-title">
-        <div className="container newsletter-band__inner">
-          <div>
-            <h2 id="news-title">Rest well, hear first.</h2>
-            <p>Join the FLONEA newsletter for new collections, fabric care tips and early access to quiet offers.</p>
+      {home.story.enabled && (
+        <section className="section" aria-labelledby="story-title">
+          <div className="container story">
+            <Img name={home.story.image} alt={home.story.imageAlt} ratio="16 / 11" sizes="(max-width: 900px) 100vw, 50vw" className="story__img" />
+            <div className="story__text">
+              <h2 id="story-title">
+                {home.story.heading1} <br />
+                {home.story.heading2}
+              </h2>
+              <p>{home.story.text}</p>
+              {home.story.buttonLabel && (
+                <Link to={safePath(home.story.buttonTo, '/about')} className="btn btn--outline">
+                  {home.story.buttonLabel}
+                </Link>
+              )}
+            </div>
           </div>
-          <NewsletterForm buttonLabel="Subscribe" />
-        </div>
-      </section>
+        </section>
+      )}
+
+      {home.testimonials.enabled && reviews.length > 0 && (
+        <section className="section section--beige" aria-labelledby="reviews-title">
+          <div className="container">
+            <div className="section-head">
+              <div>
+                <h2 id="reviews-title">{home.testimonials.heading}</h2>
+                <p>{home.testimonials.note || 'Sample reviews shown for demonstration purposes.'}</p>
+              </div>
+            </div>
+            <ul className="reviews" role="list">
+              {reviews.map((r) => (
+                <li key={r.id} className="review">
+                  <Quote size={22} className="review__quote" aria-hidden="true" />
+                  <Rating value={Math.min(5, Math.max(0, r.rating))} showLabel={false} />
+                  <blockquote>
+                    <p>{r.text}</p>
+                  </blockquote>
+                  <p className="review__by">
+                    <strong>{r.name}</strong>
+                    {r.location && `, ${r.location}`}
+                    {r.product && <span className="review__product">on {r.product}</span>}
+                  </p>
+                  {/* Testimonials are demo content and always say so. */}
+                  <span className="badge badge--outline review__demo">Sample review</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {home.newsletter.enabled && (
+        <section className="section newsletter-band" aria-labelledby="news-title">
+          <div className="container newsletter-band__inner">
+            <div>
+              <h2 id="news-title">{home.newsletter.heading}</h2>
+              <p>{home.newsletter.text}</p>
+            </div>
+            <NewsletterForm buttonLabel={home.newsletter.buttonLabel || 'Subscribe'} />
+          </div>
+        </section>
+      )}
     </>
   )
 }

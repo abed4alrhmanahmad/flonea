@@ -12,6 +12,7 @@
 .pdp__wish { display: inline-flex !important; width: auto !important; align-items: center; gap: 0.5rem; margin-top: var(--space-4); font-size: var(--fs-sm); color: var(--text); padding: 0.3rem 0; }
 .pdp__wish:hover, .pdp__wish.is-active { color: var(--forest); }
 .pdp__cross { font-size: var(--fs-sm); margin: var(--space-3) 0 0; }
+.pdp__set-note { font-size: var(--fs-xs); margin: var(--space-2) 0 0; }
 .pdp__cross a { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; }
 
 .set-includes { background: var(--white); border: 1px solid var(--beige-200); border-radius: var(--radius); padding: var(--space-4); margin-bottom: var(--space-4); }

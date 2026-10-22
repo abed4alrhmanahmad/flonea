@@ -1,9 +1,9 @@
 import { Lock } from 'lucide-react'
-import { SHIPPING } from '../../data/catalog.js'
 import { formatPrice } from '../../lib/format.js'
+import { getFreeShippingThreshold } from '../../lib/pricing.js'
 
 /** Order totals — shared by cart and checkout so the numbers always match. */
-export default function CartSummary({ totals, shippingLabel = 'Shipping (Standard)', shippingEstimate = true, title = 'Order Summary', children }) {
+export default function CartSummary({ totals, shippingLabel = 'Shipping', shippingEstimate = true, title = 'Order Summary', children }) {
   return (
     <section className="summary" aria-labelledby="summary-heading">
       <h2 id="summary-heading" className="summary__title">
@@ -28,10 +28,10 @@ export default function CartSummary({ totals, shippingLabel = 'Shipping (Standar
       {shippingEstimate && totals.amountToFreeShipping > 0 && (
         <div className="summary__progress">
           <p>
-            Add <strong>{formatPrice(totals.amountToFreeShipping)}</strong> more for free standard shipping.
+            Add <strong>{formatPrice(totals.amountToFreeShipping)}</strong> more for free shipping.
           </p>
           <span className="summary__bar" aria-hidden="true">
-            <span style={{ width: `${Math.min(100, (totals.merchandise / SHIPPING.freeThreshold) * 100)}%` }} />
+            <span style={{ width: `${Math.min(100, (totals.merchandise / Math.max(1, getFreeShippingThreshold())) * 100)}%` }} />
           </span>
         </div>
       )}

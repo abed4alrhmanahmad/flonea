@@ -4,6 +4,9 @@ import { X } from 'lucide-react'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])'
 
+/** Open dialogs, innermost last: only the top one reacts to Escape / Tab (e.g. a confirm over a drawer). */
+const openStack = []
+
 /**
  * Modal dialog rendered as a side drawer (`side="left" | "right"`) or centred modal (`side="center"`/"top").
  * Handles Escape, focus trapping, body scroll lock and focus restoration.
@@ -19,6 +22,8 @@ export default function Drawer({ open, onClose, title, side = 'right', children,
 
   useEffect(() => {
     if (!open) return undefined
+    const token = {}
+    openStack.push(token)
     const previous = document.activeElement
     document.body.classList.add('no-scroll')
     const panel = panelRef.current
@@ -26,6 +31,7 @@ export default function Drawer({ open, onClose, title, side = 'right', children,
     first?.focus()
 
     const onKey = (e) => {
+      if (openStack[openStack.length - 1] !== token) return
       if (e.key === 'Escape') {
         e.stopPropagation()
         closeRef.current()
@@ -47,7 +53,8 @@ export default function Drawer({ open, onClose, title, side = 'right', children,
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.classList.remove('no-scroll')
+      openStack.splice(openStack.indexOf(token), 1)
+      if (!openStack.length) document.body.classList.remove('no-scroll')
       if (previous instanceof HTMLElement) previous.focus()
     }
   }, [open])

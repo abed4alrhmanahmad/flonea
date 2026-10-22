@@ -1,17 +1,20 @@
 import { Check } from 'lucide-react'
 import Accordion, { AccordionItem } from '../ui/Accordion.jsx'
-import { CATEGORIES, COLORS, MATERIALS, PRICE_RANGES, SIZES } from '../../data/catalog.js'
+import { CATEGORIES, PRICE_RANGES } from '../../data/catalog.js'
+import { formatPriceBucket } from '../../lib/format.js'
+import { useCatalog } from '../../store/hooks.js'
 
 /**
  * Filter controls. `options` lists the values available in the current product set,
  * each with a product count: { category: [[id, n]], size: [...], material, color, price }.
  */
 export default function FilterPanel({ filters, options, onToggle }) {
+  const { optionIndex } = useCatalog()
   const groups = [
     { key: 'category', title: 'Category', label: (id) => CATEGORIES.find((c) => c.id === id)?.name },
-    { key: 'size', title: 'Size', label: (id) => SIZES[id]?.name, sub: (id) => SIZES[id]?.dims },
-    { key: 'material', title: 'Material', label: (id) => MATERIALS[id]?.short },
-    { key: 'price', title: 'Price Range', label: (id) => PRICE_RANGES.find((r) => r.id === id)?.label },
+    { key: 'size', title: 'Size', label: (id) => optionIndex.size[id]?.name ?? id, sub: (id) => optionIndex.size[id]?.dims },
+    { key: 'material', title: 'Material', label: (id) => optionIndex.material[id]?.short || optionIndex.material[id]?.name || id },
+    { key: 'price', title: 'Price Range', label: (id) => formatPriceBucket(PRICE_RANGES.find((r) => r.id === id)) },
   ].filter((g) => options[g.key]?.length > (g.key === 'category' ? 1 : 0))
 
   const renderChecks = (g) => (
@@ -42,7 +45,7 @@ export default function FilterPanel({ filters, options, onToggle }) {
         <AccordionItem title="Colour" defaultOpen meta={filters.color.length ? `${filters.color.length}` : null}>
           <ul role="list" className="filter-colors">
             {options.color.map(([id, count]) => {
-              const c = COLORS[id]
+              const c = optionIndex.color[id] ?? { name: id, hex: '#FFFFFF' }
               const checked = filters.color.includes(id)
               return (
                 <li key={id}>

@@ -1,4 +1,6 @@
 import { useToast } from '../../context/ToastContext.jsx'
+import { useSettings } from '../../store/hooks.js'
+import { isHttpsUrl } from '../../lib/links.js'
 
 const ICONS = {
   Instagram: (
@@ -21,21 +23,31 @@ const ICONS = {
   ),
 }
 
-/** Social channels aren't live yet, so the icons explain that instead of linking to someone else's page. */
+/**
+ * Social links from Admin → Settings. Channels without a link aren't live yet, so their icons explain
+ * that instead of linking to someone else's page.
+ */
 export default function SocialIcons() {
   const { notify } = useToast()
+  const { social, storeName } = useSettings()
   return (
     <ul className="social" role="list">
       {Object.entries(ICONS).map(([name, icon]) => (
         <li key={name}>
-          <button
-            type="button"
-            className="social__btn"
-            aria-label={`FLONEA on ${name} (coming soon)`}
-            onClick={() => notify({ tone: 'info', title: `FLONEA on ${name}`, message: 'Our social channels launch soon — join the newsletter to hear first.' })}
-          >
-            {icon}
-          </button>
+          {isHttpsUrl(social[name.toLowerCase()]) ? (
+            <a className="social__btn" href={social[name.toLowerCase()].trim()} target="_blank" rel="noopener noreferrer" aria-label={`${storeName} on ${name} (opens in a new tab)`}>
+              {icon}
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="social__btn"
+              aria-label={`${storeName} on ${name} (coming soon)`}
+              onClick={() => notify({ tone: 'info', title: `${storeName} on ${name}`, message: 'Our social channels launch soon — join the newsletter to hear first.' })}
+            >
+              {icon}
+            </button>
+          )}
         </li>
       ))}
     </ul>

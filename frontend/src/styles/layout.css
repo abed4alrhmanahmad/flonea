@@ -48,6 +48,8 @@
 }
 a.logo:hover .logo__img { opacity: 0.78; }
 .logo:focus-visible { outline-offset: 6px; }
+/* A custom logo from Admin → Settings has no built-in padding to offset. */
+.logo__img--custom { margin: 0; height: calc(var(--logo-h) * 0.62); max-width: 220px; }
 .logo--header { --logo-h: 62px; }
 .logo--footer { --logo-h: 68px; }
 .logo--menu { --logo-h: 52px; }
@@ -156,6 +158,8 @@ a.logo:hover .logo__img { opacity: 0.78; }
   padding-block: var(--space-8) var(--space-7);
 }
 .footer__brand p { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--space-3); }
+.footer__contact a { color: var(--text-body); }
+.footer__contact a:hover { color: var(--forest); }
 .footer__title {
   font-family: var(--font-sans);
   font-size: var(--fs-xs);

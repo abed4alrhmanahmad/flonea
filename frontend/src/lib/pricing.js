@@ -1,33 +1,30 @@
 /**
  * Cart pricing. Cart lines only store identifiers (product, selected options, quantity);
- * prices are always recalculated from the catalog so the product page, set builder,
- * cart and checkout can never disagree.
+ * prices are always recalculated from the live catalog so the product page, set builder,
+ * cart and checkout can never disagree — and Admin price changes apply everywhere at once.
  */
-import { PRODUCTS_BY_ID } from '../data/products.js'
-import { MAX_LINE_QUANTITY, SHIPPING, MATERIALS, COLORS, SIZES } from '../data/catalog.js'
-import { getBuilderDiscountPercent } from '../data/setBuilder.js'
-import { expandBundle, findVariant, getProductImageKeys, resolveComponentSelection, roundMoney, variantKey } from './variants.js'
+import { getCatalog, getSettings } from '../store/store.js'
+import { MAX_LINE_QUANTITY } from '../data/catalog.js'
+import { BUILDER_PATH } from '../data/setBuilder.js'
+import { findVariant, getProductImageKeys, optionLabel, roundMoney, variantKey } from './variants.js'
+import { draftFromComponents, resolveSet, setConfigurationId } from './customSet.js'
 
 /** Stable id for a cart line — identical configurations merge, different variants stay separate. */
 export function getLineId(line) {
-  const key = variantKey(line.selection)
-  if (line.type === 'custom-set') {
-    const parts = line.components.map((c) => `${c.productId}x${c.quantity}`).join(',')
-    return `custom:${key}:${parts}`
-  }
-  return `${line.type}:${line.productId}:${key}`
+  if (line.type === 'custom-set') return `custom:${setConfigurationId(line.components)}`
+  return `${line.type}:${line.productId}:${variantKey(line.selection)}`
 }
 
-const optionLabels = (selection) =>
+const optionLabels = (product, selection) =>
   [
-    { label: 'Size', value: SIZES[selection.size]?.name },
-    { label: 'Material', value: MATERIALS[selection.material]?.short },
-    { label: 'Colour', value: COLORS[selection.color]?.name },
+    { label: 'Size', value: optionLabel(product, 'size', selection.size) },
+    { label: 'Material', value: optionLabel(product, 'material', selection.material) },
+    { label: 'Colour', value: optionLabel(product, 'color', selection.color) },
   ].filter((o) => o.value)
 
-function describeComponents(components) {
+function describeComponents(components, catalog) {
   return components.map((c) => {
-    const product = PRODUCTS_BY_ID[c.productId]
+    const product = catalog.allById[c.productId]
     const variant = product?.variantsByKey[c.variantKey]
     return {
       productId: c.productId,
@@ -35,43 +32,41 @@ function describeComponents(components) {
       slug: product?.slug,
       quantity: c.quantity,
       unitPrice: c.unitPrice,
-      details: variant ? [SIZES[variant.size]?.name, COLORS[variant.color]?.name].filter(Boolean).join(' · ') : '',
+      details: variant ? [optionLabel(product, 'size', variant.size), optionLabel(product, 'color', variant.color)].filter(Boolean).join(' · ') : '',
     }
   })
 }
 
 /**
  * Resolves a stored cart line against the catalog.
- * Returns null when the product or configuration no longer exists.
+ * Returns null when the product or configuration can't be bought right now (removed, switched off
+ * in the Admin, or no longer offered in that combination).
  */
-export function resolveCartLine(line) {
-  if (!line || !line.selection || !line.type) return null
+export function resolveCartLine(line, catalogArg) {
+  if (!line || !line.type) return null
+  // Tolerates being used as `lines.map(resolveCartLine)`, where the 2nd argument is an index.
+  const catalog = catalogArg?.byId ? catalogArg : getCatalog()
 
+  // Custom bedding set: one line, each component keeps its own options, priced at the sum of
+  // the components' regular prices (no set discount).
   if (line.type === 'custom-set') {
-    const discountPercent = getBuilderDiscountPercent(line.components)
-    const lead = PRODUCTS_BY_ID[line.components[0]?.productId]
-    if (!lead) return null
-    const [variant] = expandBundle(
-      {
-        components: line.components,
-        discountPercent,
-        candidates: { materials: [line.selection.material], colors: [line.selection.color], sizes: [line.selection.size] },
-      },
-      PRODUCTS_BY_ID,
-    )
-    if (!variant) return null
+    const draft = draftFromComponents(line.components)
+    const set = draft && resolveSet(draft, catalog)
+    if (!set?.isConfigured) return null
+    const lead = set.chosen.find((c) => c.role === 'duvet') ?? set.chosen[0]
     return buildResolved(line, {
-      name: discountPercent ? 'Custom Bedding Set' : 'Custom Bedding Bundle',
-      href: '/bedding-sets/builder',
-      imageKey: getProductImageKeys(lead, line.selection.color)[0],
-      variant,
-      kindLabel: discountPercent ? `Full Set · ${discountPercent}% set saving` : 'Bundle',
-      options: optionLabels(line.selection),
-      components: describeComponents(variant.components),
+      name: 'Custom Bedding Set',
+      href: BUILDER_PATH,
+      imageKey: lead.imageKey,
+      variant: { price: set.total, compareAtPrice: null, stock: set.stock },
+      kindLabel: set.summary,
+      options: set.chosen.map((c) => ({ label: c.roleLabel, value: c.name })),
+      components: set.chosen,
     })
   }
 
-  const product = PRODUCTS_BY_ID[line.productId]
+  if (!line.selection) return null
+  const product = catalog.byId[line.productId]
   if (!product) return null
   const variant = findVariant(product, line.selection)
   if (!variant) return null
@@ -82,8 +77,8 @@ export function resolveCartLine(line) {
     product,
     variant,
     kindLabel: product.isBundle ? `Bedding Set · ${product.bundle.discountPercent}% set saving` : null,
-    options: optionLabels(line.selection),
-    components: product.isBundle ? describeComponents(variant.components) : null,
+    options: optionLabels(product, line.selection),
+    components: product.isBundle ? describeComponents(variant.components, catalog) : null,
   })
 }
 
@@ -106,16 +101,26 @@ function buildResolved(line, info) {
   }
 }
 
+// ─── Shipping (demo rules from Admin → Settings) ────────────────────────────
+
+/** Delivery methods customers can choose. */
+export const getShippingMethods = () => getSettings().shipping.methods.filter((m) => m.enabled)
+export const getDefaultShippingMethodId = () => getShippingMethods()[0]?.id ?? 'standard'
+/** True when at least one method becomes free over the threshold. */
+export const offersFreeShipping = () => getShippingMethods().some((m) => m.freeOverThreshold)
+export const getFreeShippingThreshold = () => getSettings().shipping.freeThreshold
+
 /** Shipping cost for a method, given the merchandise total after set savings. */
 export function getShippingCost(methodId, merchandiseTotal) {
-  const method = SHIPPING.methods.find((m) => m.id === methodId) ?? SHIPPING.methods[0]
-  if (merchandiseTotal <= 0) return 0
-  if (method.freeOverThreshold && merchandiseTotal >= SHIPPING.freeThreshold) return 0
+  const methods = getShippingMethods()
+  const method = methods.find((m) => m.id === methodId) ?? methods[0]
+  if (!method || merchandiseTotal <= 0) return 0
+  if (method.freeOverThreshold && merchandiseTotal >= getFreeShippingThreshold()) return 0
   return method.price
 }
 
 /** Totals shared by cart and checkout. */
-export function calculateTotals(resolvedLines, shippingMethodId = 'standard') {
+export function calculateTotals(resolvedLines, shippingMethodId = getDefaultShippingMethodId()) {
   const subtotal = roundMoney(resolvedLines.reduce((s, l) => s + l.lineCompareTotal, 0))
   const savings = roundMoney(resolvedLines.reduce((s, l) => s + l.savings, 0))
   const merchandise = roundMoney(subtotal - savings)
@@ -128,22 +133,6 @@ export function calculateTotals(resolvedLines, shippingMethodId = 'standard') {
     shipping,
     total: roundMoney(merchandise + shipping),
     itemCount,
-    amountToFreeShipping: Math.max(0, roundMoney(SHIPPING.freeThreshold - merchandise)),
+    amountToFreeShipping: offersFreeShipping() ? Math.max(0, roundMoney(getFreeShippingThreshold() - merchandise)) : 0,
   }
-}
-
-/** Builds the stored line for a builder configuration (used by both the builder and tests). */
-export function makeCustomSetLine(selection, components, quantity = 1) {
-  return {
-    type: 'custom-set',
-    selection: { ...selection },
-    components: components.filter((c) => c.quantity > 0).map((c) => ({ productId: c.productId, quantity: c.quantity })),
-    quantity,
-  }
-}
-
-/** Selection for a single component of the builder (used in Individual Items mode). */
-export const componentSelection = (productId, selection) => {
-  const product = PRODUCTS_BY_ID[productId]
-  return product ? resolveComponentSelection(product, selection) : null
 }

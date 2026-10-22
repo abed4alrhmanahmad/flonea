@@ -18,7 +18,30 @@ export default function CartItem({ line, onQuantity, onRemove, compact = false }
           <Link to={line.href}>{line.name}</Link>
         </h3>
         <p className="cart-item__options">{line.options.map((o) => o.value).join(' · ')}</p>
-        {line.components && (
+        {line.type === 'custom-set' ? (
+          <details className="cart-set">
+            <summary>View set details</summary>
+            <ul className="cart-set__list" role="list" aria-label="Items in this set">
+              {line.components.map((c) => (
+                <li key={c.role} className="cart-set__item">
+                  <Img name={c.imageKey} alt="" ratio="1 / 1" sizes="48px" className="cart-set__img" />
+                  <span className="cart-set__info">
+                    <span className="cart-set__role">{c.roleLabel}</span>
+                    <Link to={c.href} className="cart-set__name">
+                      {c.name}
+                    </Link>
+                    <span className="cart-set__options">{c.details}</span>
+                    <span className="muted">
+                      {c.quantity} × {formatPrice(c.unitPrice)}
+                    </span>
+                  </span>
+                  <span className="price">{formatPrice(c.lineTotal)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="cart-set__note muted">Prices per set. Each item keeps its own size, material and colour.</p>
+          </details>
+        ) : line.components && (
           <ul className="cart-item__components" role="list" aria-label="Included items">
             {line.components.map((c) => (
               <li key={c.productId}>

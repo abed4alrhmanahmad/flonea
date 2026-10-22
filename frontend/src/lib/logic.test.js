@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { PRODUCTS, getProductById } from '../data/products.js'
+import { getProducts, getProductById } from '../store/store.js'
 import { IMAGE_SOURCES } from '../data/images.js'
 import { changeSelection, findVariant, getDefaultSelection, isOptionCompatible } from './variants.js'
-import { calculateTotals, makeCustomSetLine, resolveCartLine } from './pricing.js'
+import { calculateTotals, resolveCartLine } from './pricing.js'
 import { addLineToCart, sanitizeCart, setLineQuantity } from './cart.js'
+import { makeCustomSetLine, resolveSet, roleForProduct, sanitizeDraft } from './customSet.js'
 import { EMPTY_FILTERS, filterProducts, sortProducts } from './filters.js'
 import { validateCheckout } from './validation.js'
 
+const PRODUCTS = getProducts()
 const sig = () => getProductById('signature-duvet-cover')
 
 describe('catalog', () => {
@@ -102,25 +104,89 @@ describe('cart', () => {
     expect(calculateTotals(lines.map(resolveCartLine), 'express').shipping).toBe(18)
   })
 
-  it('applies the builder discount only to qualifying full sets', () => {
-    const sel = { material: 'organic-cotton', color: 'white', size: 'queen' }
-    const full = resolveCartLine(
-      makeCustomSetLine(sel, [
-        { productId: 'signature-duvet-cover', quantity: 1 },
-        { productId: 'signature-pillowcase-set', quantity: 2 },
-      ]),
-    )
-    // 89 + 2×29 = 147 → 10% off = 132.30
-    expect(full.unitPrice).toBe(132.3)
-    expect(full.savings).toBe(14.7)
-    const duvetOnly = resolveCartLine(makeCustomSetLine(sel, [{ productId: 'signature-duvet-cover', quantity: 1 }]))
-    expect(duvetOnly.savings).toBe(0)
-  })
-
   it('sanitizes corrupted storage', () => {
     expect(sanitizeCart('nope')).toEqual([])
     expect(sanitizeCart([null, { type: 'product', productId: 'missing', selection: {}, quantity: 1 }, line('queen', -2)])).toEqual([])
     expect(sanitizeCart([line('queen'), line('queen')])[0].quantity).toBe(2)
+  })
+})
+
+describe('custom bedding set', () => {
+  // King pillowcase set + Queen duvet cover: sizes deliberately differ.
+  const pillow = { productId: 'signature-pillowcase-set', selection: { material: 'organic-cotton', color: 'white', size: 'king-pillow' }, quantity: 1 }
+  const duvet = { productId: 'signature-duvet-cover', selection: { material: 'organic-cotton', color: 'white', size: 'queen' }, quantity: 1 }
+
+  it('assigns every Pillows & Pillowcases product to the pillow role and duvet covers to the duvet role', () => {
+    for (const p of PRODUCTS) {
+      const role = roleForProduct(p)?.id ?? null
+      if (['pillows', 'pillowcases'].includes(p.category)) expect(role, p.id).toBe('pillow')
+      else if (p.category === 'duvet-covers') expect(role, p.id).toBe('duvet')
+      else expect(role, p.id).toBeNull()
+    }
+  })
+
+  it('requires both components and reports what is missing', () => {
+    const empty = resolveSet({ pillow: null, duvet: null })
+    expect(empty.isComplete).toBe(false)
+    expect(empty.errors.map((e) => e.role)).toEqual(['pillow', 'duvet'])
+    const half = resolveSet({ pillow, duvet: null })
+    expect(half.isComplete).toBe(false)
+    expect(half.errors).toEqual([{ role: 'duvet', message: 'Add a duvet cover to your set.' }])
+    expect(addLineToCart([], makeCustomSetLine({ pillow, duvet: null })).error).toBeTruthy()
+  })
+
+  it('keeps independent options per component and prices at the sum of regular prices', () => {
+    const set = resolveSet({ pillow, duvet })
+    expect(set.isComplete).toBe(true)
+    expect(set.components.map((c) => c.selection.size)).toEqual(['king-pillow', 'queen'])
+    expect(set.total).toBe(35 + 89) // no discount
+    expect(set.summary).toBe('1 Pillow Product + 1 Duvet Cover')
+
+    const mixed = resolveSet({ pillow: { ...pillow, selection: { material: 'linen', color: 'sage', size: 'standard' } }, duvet })
+    expect(mixed.isComplete).toBe(true)
+    expect(mixed.total).toBe(29 + 12 + 89)
+  })
+
+  it('adds the set to the cart as ONE line with both components and no savings', () => {
+    const { lines } = addLineToCart([], makeCustomSetLine({ pillow: { ...pillow, quantity: 2 }, duvet }))
+    expect(lines).toHaveLength(1)
+    const line = resolveCartLine(lines[0])
+    expect(line.type).toBe('custom-set')
+    expect(line.name).toBe('Custom Bedding Set')
+    expect(line.kindLabel).toBe('2 Pillow Products + 1 Duvet Cover')
+    expect(line.components.map((c) => [c.role, c.productId, c.selection.size, c.quantity, c.unitPrice])).toEqual([
+      ['pillow', 'signature-pillowcase-set', 'king-pillow', 2, 35],
+      ['duvet', 'signature-duvet-cover', 'queen', 1, 89],
+    ])
+    expect(line.unitPrice).toBe(2 * 35 + 89)
+    expect(line.savings).toBe(0)
+    expect(calculateTotals([line]).itemCount).toBe(1)
+  })
+
+  it('merges identical sets and keeps different configurations separate', () => {
+    let lines = addLineToCart([], makeCustomSetLine({ pillow, duvet })).lines
+    lines = addLineToCart(lines, makeCustomSetLine({ pillow, duvet })).lines
+    expect(lines).toHaveLength(1)
+    expect(lines[0].quantity).toBe(2)
+    lines = addLineToCart(lines, makeCustomSetLine({ pillow, duvet: { ...duvet, selection: { ...duvet.selection, size: 'king' } } })).lines
+    expect(lines).toHaveLength(2)
+  })
+
+  it('rejects wrong roles, unavailable or sold-out variants and bad quantities', () => {
+    const asLine = (draft) => resolveCartLine(makeCustomSetLine(draft))
+    expect(asLine({ pillow: { ...duvet }, duvet })).toBeNull() // a duvet cover can't fill the pillow role
+    expect(asLine({ pillow, duvet: { ...duvet, selection: { ...duvet.selection, color: 'black', material: 'linen' } } })).toBeNull()
+    expect(asLine({ pillow, duvet: { ...duvet, quantity: 2 } })).toBeNull() // one duvet cover per set
+    const soldOut = { ...duvet, selection: { material: 'organic-cotton', color: 'sage', size: 'king' } }
+    expect(resolveSet({ pillow, duvet: soldOut }).errors[0].message).toMatch(/sold out/)
+    expect(addLineToCart([], makeCustomSetLine({ pillow, duvet: soldOut })).error).toMatch(/sold out/)
+  })
+
+  it('sanitizes stored drafts and drops legacy builder lines', () => {
+    expect(sanitizeDraft('nope')).toEqual({ pillow: null, duvet: null })
+    expect(sanitizeDraft({ pillow: { ...duvet }, duvet: { ...duvet, quantity: 9 } })).toEqual({ pillow: null, duvet: { ...duvet, quantity: 1 } })
+    const legacy = { type: 'custom-set', selection: duvet.selection, components: [{ productId: 'signature-duvet-cover', quantity: 1 }], quantity: 1 }
+    expect(sanitizeCart([legacy])).toEqual([])
   })
 })
 

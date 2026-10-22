@@ -7,6 +7,9 @@
  *
  * To use real FLONEA product photography, replace the two files for a key with
  * new files of the same name — or point `src` at a different location below.
+ *
+ * Anywhere an image is referenced (products, collections, homepage content) the value may also be
+ * an image URL: an absolute https:// address or a site path such as /images/my-photo.jpg.
  */
 
 export const IMAGE_SOURCES = {
@@ -59,8 +62,21 @@ export const IMAGE_SOURCES = {
 
 const BASE = `${import.meta.env?.BASE_URL ?? '/'}images`
 
-/** Returns { src, srcSet, alt } for a key. Falls back to the hero image if the key is unknown. */
+/** Image keys available in the library, in registry order (used by the Admin image picker). */
+export const IMAGE_KEYS = Object.keys(IMAGE_SOURCES)
+
+/** True for an image URL (https://… or a /site/path) rather than a library key. */
+export const isImageUrl = (ref) => typeof ref === 'string' && /^(https?:\/\/|\/(?!\/))\S+$/i.test(ref.trim())
+
+/** True when `ref` is a library key or an image URL. */
+export const isImageRef = (ref) => Boolean(IMAGE_SOURCES[ref]) || isImageUrl(ref)
+
+/** Returns { src, srcSet, alt } for a key or URL. Falls back to the hero image if the key is unknown. */
 export function getImage(key) {
+  if (isImageUrl(key)) {
+    const src = key.trim()
+    return { key: src, src, srcSm: src, srcSet: undefined, alt: '' }
+  }
   const entry = IMAGE_SOURCES[key] ? key : 'hero'
   return {
     key: entry,

@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import Drawer from '../ui/Drawer.jsx'
 import Img from '../ui/Img.jsx'
-import { PRODUCTS } from '../../data/products.js'
 import { filterProducts } from '../../lib/filters.js'
+import { useCatalog } from '../../store/hooks.js'
 import { formatPriceRange } from '../../lib/format.js'
 
 const SUGGESTIONS = ['Linen', 'Silk', 'Forest Green', 'Pillow', 'King', 'Set']
@@ -13,7 +13,8 @@ export default function SearchDialog({ open, onClose }) {
   const [query, setQuery] = useState('')
   const deferred = useDeferredValue(query)
   const navigate = useNavigate()
-  const results = useMemo(() => (deferred.trim() ? filterProducts(PRODUCTS, { query: deferred }) : []), [deferred])
+  const { products } = useCatalog()
+  const results = useMemo(() => (deferred.trim() ? filterProducts(products, { query: deferred }) : []), [deferred, products])
 
   const submit = (e) => {
     e.preventDefault()

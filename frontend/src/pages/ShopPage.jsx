@@ -9,36 +9,52 @@ import ProductGrid from '../components/product/ProductGrid.jsx'
 import FilterPanel from '../components/shop/FilterPanel.jsx'
 import ActiveFilters from '../components/shop/ActiveFilters.jsx'
 import SortSelect from '../components/shop/SortSelect.jsx'
-import { PRODUCTS } from '../data/products.js'
-import { COLLECTIONS } from '../data/catalog.js'
+import SetModeBanner from '../components/product/SetModeBanner.jsx'
+import { SET_ROLES, collectionPathFor } from '../data/setBuilder.js'
 import { countActiveFilters } from '../lib/filters.js'
 import { pluralize } from '../lib/format.js'
+import { roleForProduct } from '../lib/customSet.js'
+import { useCatalog } from '../store/hooks.js'
 import { useProductFilters } from '../hooks/useProductFilters.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js'
+import { useSetMode } from '../hooks/useSetMode.js'
 import NotFoundPage from './NotFoundPage.jsx'
 import '../styles/shop.css'
 
-const SHOP = { id: 'shop', title: 'Shop All Bedding', subtitle: 'Duvet covers, pillows and complete sets in natural fabrics.', image: 'heroRoom', categories: null }
+const SHOP = { id: 'shop', title: 'Shop All Bedding', subtitle: 'Duvet covers, pillows and complete sets in natural fabrics.', image: 'heroRoom', products: null }
 
 export default function ShopPage() {
   const { collectionId } = useParams()
-  const collection = collectionId ? COLLECTIONS[collectionId] : SHOP
-  if (!collection) return <NotFoundPage />
+  const { collectionsById } = useCatalog()
+  const collection = collectionId ? collectionsById[collectionId] : SHOP
+  // Disabled collections are hidden from customers.
+  if (!collection || collection.enabled === false) return <NotFoundPage />
   return <Listing key={collection.id} collection={collection} />
 }
 
 function Listing({ collection }) {
   useDocumentTitle(collection.title)
-  const base = useMemo(
-    () => (collection.categories ? PRODUCTS.filter((p) => collection.categories.includes(p.category)) : PRODUCTS),
-    [collection],
-  )
+  const { products, collections } = useCatalog()
+  const isShop = collection.id === 'shop'
+  // Build a Set mode only applies to the collections that supply a set component, and then only
+  // lists the products that can fill that role.
+  const setMode = useSetMode()
+  const setRole = setMode ? SET_ROLES.find((r) => r.collectionId === collection.id) ?? null : null
+  const base = useMemo(() => {
+    const list = collection.products ?? products
+    return setRole ? list.filter((p) => roleForProduct(p)?.id === setRole.id) : list
+  }, [collection, products, setRole])
+  // Collections are shown in their Admin order; "Shop all" keeps the featured sort.
   const { query, sort, filters, results, pageItems, page, pageCount, options, toggleFilter, setQuery, setSort, clearAll, setPage } =
-    useProductFilters(base)
+    useProductFilters(base, { manualOrder: !isShop })
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [dense, setDense] = useState(false)
   const activeCount = countActiveFilters(filters)
-  const isShop = collection.id === 'shop'
+  const navCollections = collections.filter((c) => c.enabled && c.listed)
+  const collectionHref = (id) => {
+    const role = setRole && SET_ROLES.find((r) => r.collectionId === id)
+    return role ? collectionPathFor(role) : `/collections/${id}`
+  }
 
   const removeFilter = (key, id) => toggleFilter(key, id)
 
@@ -49,19 +65,27 @@ function Listing({ collection }) {
         <div className="listing-hero__overlay" />
         <div className="container listing-hero__content">
           <h1>{collection.title}</h1>
-          <p>{collection.subtitle}</p>
+          {collection.subtitle && <p>{collection.subtitle}</p>}
         </div>
       </section>
 
       <div className="container listing">
         <Breadcrumbs items={isShop ? [{ label: 'Home', to: '/' }, { label: 'Shop' }] : [{ label: 'Home', to: '/' }, { label: 'Shop', to: '/shop' }, { label: collection.title }]} />
 
+        {setRole && (
+          <SetModeBanner
+            role={setRole}
+            hint="Choose a product below, pick its own size, material and colour, then select Add to Set. Each product is added as one complete item."
+            exitTo={collectionPathFor(setRole, false)}
+          />
+        )}
+
         <nav className="collection-nav" aria-label="Collections">
           <ul role="list">
             <li><Link to="/shop" className={isShop ? 'is-active' : ''} aria-current={isShop ? 'page' : undefined}>All</Link></li>
-            {Object.values(COLLECTIONS).map((c) => (
+            {navCollections.map((c) => (
               <li key={c.id}>
-                <Link to={`/collections/${c.id}`} className={collection.id === c.id ? 'is-active' : ''} aria-current={collection.id === c.id ? 'page' : undefined}>
+                <Link to={collectionHref(c.id)} className={collection.id === c.id ? 'is-active' : ''} aria-current={collection.id === c.id ? 'page' : undefined}>
                   {c.title}
                 </Link>
               </li>
@@ -135,7 +159,7 @@ function Listing({ collection }) {
               </EmptyState>
             ) : (
               <>
-                <ProductGrid products={pageItems} columns={dense ? 4 : 3} priorityCount={3} />
+                <ProductGrid products={pageItems} columns={dense ? 4 : 3} priorityCount={3} setMode={Boolean(setRole)} />
                 {pageCount > 1 && (
                   <nav className="pagination" aria-label="Pagination">
                     <button type="button" className="icon-btn" onClick={() => setPage(page - 1)} disabled={page === 1} aria-label="Previous page">

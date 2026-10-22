@@ -5,15 +5,23 @@ import Img from '../ui/Img.jsx'
 import { ColorSwatches } from './Options.jsx'
 import { formatPriceRange } from '../../lib/format.js'
 import { getProductImageKeys } from '../../lib/variants.js'
+import { roleForProduct } from '../../lib/customSet.js'
+import { SET_MODE_PARAM, SET_MODE_VALUE } from '../../data/setBuilder.js'
 import { useShopActions } from '../../hooks/useShopActions.js'
 import { useQuickAdd } from './QuickAdd.jsx'
 
-function ProductCard({ product, priority = false }) {
+/** `setMode`: the card is shown inside the Build a Set flow, so it links to and adds into the set. */
+function ProductCard({ product, priority = false, setMode = false }) {
   const [color, setColor] = useState(product.availableColors[0])
   const { toggleWishlist, isWishlisted } = useShopActions()
   const openQuickAdd = useQuickAdd()
   const images = getProductImageKeys(product, color)
-  const href = `/products/${product.slug}${color && product.availableColors.length > 1 ? `?color=${color}` : ''}`
+  const forSet = setMode && Boolean(roleForProduct(product))
+  const params = new URLSearchParams()
+  if (forSet) params.set(SET_MODE_PARAM, SET_MODE_VALUE)
+  if (color && product.availableColors.length > 1) params.set('color', color)
+  const query = params.toString()
+  const href = `/products/${product.slug}${query ? `?${query}` : ''}`
   const saved = isWishlisted(product.id)
 
   return (
@@ -37,9 +45,14 @@ function ProductCard({ product, priority = false }) {
         >
           <Heart size={17} fill={saved ? 'currentColor' : 'none'} />
         </button>
-        <button type="button" className="product-card__quick" onClick={() => openQuickAdd(product, color)} aria-label={`Quick add ${product.name}`}>
+        <button
+          type="button"
+          className="product-card__quick"
+          onClick={() => openQuickAdd(product, color, { setMode: forSet })}
+          aria-label={forSet ? `Add ${product.name} to your set` : `Quick add ${product.name}`}
+        >
           <Plus size={15} aria-hidden="true" />
-          <span>Quick Add</span>
+          <span>{forSet ? 'Add to Set' : 'Quick Add'}</span>
         </button>
       </div>
       <div className="product-card__body">
@@ -48,7 +61,7 @@ function ProductCard({ product, priority = false }) {
         </h3>
         <p className="product-card__price price">{formatPriceRange(product.priceRange)}</p>
         {product.availableColors.length > 1 ? (
-          <ColorSwatches colors={product.availableColors} value={color} onChange={setColor} size="sm" label={`${product.name} colours`} />
+          <ColorSwatches colors={product.availableColors} product={product} value={color} onChange={setColor} size="sm" label={`${product.name} colours`} />
         ) : (
           <p className="product-card__meta">{product.tagline}</p>
         )}

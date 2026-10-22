@@ -6,12 +6,13 @@ import CartSummary from '../components/cart/CartSummary.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import Img from '../components/ui/Img.jsx'
 import { useCart } from '../context/CartContext.jsx'
-import { SHIPPING } from '../data/catalog.js'
-import { calculateTotals, getShippingCost } from '../lib/pricing.js'
+import { calculateTotals, getDefaultShippingMethodId, getShippingCost, getShippingMethods } from '../lib/pricing.js'
 import { formatPrice } from '../lib/format.js'
-import { COUNTRIES, validateCheckout } from '../lib/validation.js'
+import { validateCheckout } from '../lib/validation.js'
 import { STORAGE_KEYS, writeStorage } from '../lib/storage.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js'
+import { useSettings } from '../store/hooks.js'
+import { newDemoOrderStamp, recordDemoOrder } from '../store/store.js'
 import '../styles/checkout.css'
 
 const STEPS = ['Details', 'Review', 'Confirmation']
@@ -24,8 +25,8 @@ const INITIAL = {
   apartment: '',
   city: '',
   postalCode: '',
-  country: 'Lebanon',
-  shippingMethod: 'standard',
+  country: '',
+  shippingMethod: '',
   notes: '',
 }
 const FIELD_ORDER = ['email', 'phone', 'firstName', 'lastName', 'address', 'city', 'postalCode', 'country', 'shippingMethod']
@@ -63,7 +64,8 @@ function Field({ name, label, required, error, hint, children }) {
 export default function CheckoutPage() {
   useDocumentTitle('Checkout')
   const { lines, clear } = useCart()
-  const [values, setValues] = useState(INITIAL)
+  const { checkout } = useSettings()
+  const [values, setValues] = useState(() => ({ ...INITIAL, country: checkout.defaultCountry, shippingMethod: getDefaultShippingMethodId() }))
   const [touched, setTouched] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [step, setStep] = useState(0)
@@ -71,9 +73,13 @@ export default function CheckoutPage() {
   const errorSummaryRef = useRef(null)
 
   const totals = useMemo(() => calculateTotals(lines, values.shippingMethod), [lines, values.shippingMethod])
+
   const errors = useMemo(() => validateCheckout(values), [values])
   const visibleError = (name) => (submitted || touched[name] ? errors[name] : undefined)
-  const shippingMethod = SHIPPING.methods.find((m) => m.id === values.shippingMethod)
+  const shippingMethods = getShippingMethods()
+  // Falls back to the first method if the chosen one was switched off in the Admin meanwhile.
+  const shippingMethod = shippingMethods.find((m) => m.id === values.shippingMethod) ?? shippingMethods[0]
+  const countries = checkout.countries.includes(values.country) ? checkout.countries : [values.country, ...checkout.countries].filter(Boolean)
 
   const set = (name) => (e) => setValues((v) => ({ ...v, [name]: e.target.value }))
   const blur = (name) => () => setTouched((t) => ({ ...t, [name]: true }))
@@ -101,18 +107,46 @@ export default function CheckoutPage() {
   }
 
   const placeDemoOrder = () => {
-    const number = `DEMO-${Date.now().toString(36).toUpperCase().slice(-6)}`
+    const { number, createdAt } = newDemoOrderStamp()
+    const items = lines.map((l) => ({
+      type: l.type,
+      productId: l.productId ?? '',
+      name: l.name,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      // A custom set lists each component with its own options.
+      options: l.type === 'custom-set' ? l.components.map((c) => `${c.quantity} × ${c.name} (${c.details})`).join(' + ') : l.options.map((o) => o.value).join(' · '),
+      total: l.lineTotal,
+      imageKey: l.imageKey,
+      components:
+        l.type === 'custom-set'
+          ? l.components.map((c) => ({ role: c.role, roleLabel: c.roleLabel, productId: c.productId, name: c.name, quantity: c.quantity, unitPrice: c.unitPrice, details: c.details }))
+          : [],
+    }))
     const snapshot = {
       number,
-      createdAt: new Date().toISOString(),
+      createdAt,
       email: values.email,
       name: `${values.firstName} ${values.lastName}`,
-      items: lines.map((l) => ({ name: l.name, quantity: l.quantity, options: l.options.map((o) => o.value).join(' · '), total: l.lineTotal, imageKey: l.imageKey })),
+      items,
       totals,
       shipping: shippingMethod,
       address: values,
     }
     writeStorage(STORAGE_KEYS.lastOrder, snapshot)
+    // Also kept in the local demo orders log shown in Admin → Orders. No payment, no shipping, no stock change.
+    recordDemoOrder({
+      id: number,
+      number,
+      createdAt,
+      status: 'placed',
+      customer: { email: values.email, phone: values.phone, firstName: values.firstName, lastName: values.lastName },
+      shippingAddress: { address: values.address, apartment: values.apartment, city: values.city, postalCode: values.postalCode, country: values.country },
+      shippingMethod: { id: shippingMethod.id, name: shippingMethod.name, eta: shippingMethod.eta, price: totals.shipping },
+      notes: values.notes,
+      items,
+      totals,
+    })
     setOrder(snapshot)
     clear()
     setStep(2)
@@ -212,7 +246,7 @@ export default function CheckoutPage() {
                 <div className="form-grid__full">
                   <Field name="country" label="Country" required error={visibleError('country')}>
                     <select className="select" autoComplete="country-name" {...inputProps('country', { required: true })}>
-                      {COUNTRIES.map((c) => (
+                      {countries.map((c) => (
                         <option key={c}>{c}</option>
                       ))}
                     </select>
@@ -224,11 +258,11 @@ export default function CheckoutPage() {
             <fieldset className="form-section" id="co-shippingMethod" tabIndex={-1}>
               <legend>Delivery Method</legend>
               <div className="ship-options">
-                {SHIPPING.methods.map((m) => {
+                {shippingMethods.map((m) => {
                   const cost = getShippingCost(m.id, totals.merchandise)
                   return (
-                    <label key={m.id} className={`ship-option ${values.shippingMethod === m.id ? 'is-selected' : ''}`}>
-                      <input type="radio" name="shippingMethod" value={m.id} checked={values.shippingMethod === m.id} onChange={set('shippingMethod')} />
+                    <label key={m.id} className={`ship-option ${shippingMethod?.id === m.id ? 'is-selected' : ''}`}>
+                      <input type="radio" name="shippingMethod" value={m.id} checked={shippingMethod?.id === m.id} onChange={set('shippingMethod')} />
                       <span className="ship-option__text">
                         <strong>{m.name}</strong>
                         <span className="muted">{m.eta}</span>
@@ -301,7 +335,7 @@ export default function CheckoutPage() {
         )}
 
         <aside className="checkout__aside">
-          <CartSummary totals={totals} shippingLabel={`Shipping (${shippingMethod.name.replace(' (demo)', '')})`} shippingEstimate={values.shippingMethod === 'standard'}>
+          <CartSummary totals={totals} shippingLabel={`Shipping (${shippingMethod.name.replace(' (demo)', '')})`} shippingEstimate={shippingMethod.freeOverThreshold}>
             <ul className="checkout__mini" role="list">
               {lines.map((l) => (
                 <li key={l.id}><CartItem line={l} compact /></li>

@@ -51,7 +51,7 @@ export default function WishlistPage() {
                   <Link to={`/products/${p.slug}`}>{p.name}</Link>
                 </h2>
                 <p className="price">{formatPriceRange(p.priceRange)}</p>
-                {p.availableColors.length > 1 && <ColorSwatches colors={p.availableColors} value={null} onChange={(c) => openQuickAdd(p, c)} size="sm" label={`${p.name} colours — choose to add to cart`} />}
+                {p.availableColors.length > 1 && <ColorSwatches colors={p.availableColors} product={p} value={null} onChange={(c) => openQuickAdd(p, c)} size="sm" label={`${p.name} colours — choose to add to cart`} />}
                 <button type="button" className="btn btn--sm btn--block" onClick={() => openQuickAdd(p)}>
                   Add to Cart
                 </button>

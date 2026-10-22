@@ -1,15 +1,19 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { PRICE_RANGES, SIZES } from '../data/catalog.js'
+import { PRICE_RANGES } from '../data/catalog.js'
 import { EMPTY_FILTERS, FILTER_KEYS, SORT_OPTIONS, filterProducts, sortProducts } from '../lib/filters.js'
+import { useCatalog } from '../store/hooks.js'
 
 export const PAGE_SIZE = 12
 
 /**
  * Search, filters, sorting and pagination stored in the URL (?q=&color=sage,white&sort=newest&page=2),
  * so results are shareable and survive refresh / back navigation.
+ * `manualOrder`: the base list is already in the merchandised order (a collection's Admin order),
+ * which the default "Featured" sort keeps.
  */
-export function useProductFilters(baseProducts) {
+export function useProductFilters(baseProducts, { manualOrder = false } = {}) {
+  const { optionIndex } = useCatalog()
   const [params, setParams] = useSearchParams()
 
   const query = params.get('q') ?? ''
@@ -59,7 +63,10 @@ export function useProductFilters(baseProducts) {
     [setParams],
   )
 
-  const results = useMemo(() => sortProducts(filterProducts(baseProducts, { query, filters }), sort), [baseProducts, query, filters, sort])
+  const results = useMemo(() => {
+    const filtered = filterProducts(baseProducts, { query, filters })
+    return sort === 'featured' && manualOrder ? filtered : sortProducts(filtered, sort)
+  }, [baseProducts, query, filters, sort, manualOrder])
 
   /** Values present in the base product set, with how many products offer each. */
   const options = useMemo(() => {
@@ -72,12 +79,12 @@ export function useProductFilters(baseProducts) {
     const priceCounts = PRICE_RANGES.map((r) => [r.id, baseProducts.filter((p) => p.variants.some((v) => v.price >= r.min && v.price < r.max)).length])
     return {
       category: [...count((p) => [p.category])],
-      size: [...sizes].sort((a, b) => SIZES[a[0]].order - SIZES[b[0]].order),
+      size: [...sizes].sort((a, b) => (optionIndex.size[a[0]]?.order ?? 999) - (optionIndex.size[b[0]]?.order ?? 999)),
       material: [...count((p) => p.availableMaterials)],
       color: [...count((p) => p.availableColors)],
       price: priceCounts.filter(([, n]) => n > 0),
     }
-  }, [baseProducts])
+  }, [baseProducts, optionIndex])
 
   const pageCount = Math.max(1, Math.ceil(results.length / PAGE_SIZE))
   const page = Math.min(Math.max(1, parseInt(params.get('page') ?? '1', 10) || 1), pageCount)

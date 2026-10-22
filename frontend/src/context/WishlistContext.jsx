@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { PRODUCTS_BY_ID } from '../data/products.js'
 import { readStorage, STORAGE_KEYS, writeStorage } from '../lib/storage.js'
+import { useCatalog } from '../store/hooks.js'
 
 const WishlistContext = createContext(null)
 
-const sanitize = (value) =>
-  Array.isArray(value) ? [...new Set(value.filter((id) => typeof id === 'string' && PRODUCTS_BY_ID[id]))] : []
+// Saved ids are kept even while a product is hidden (draft / archived), so it comes back if the
+// Admin re-activates it; only purchasable products are shown and counted.
+const sanitize = (value) => (Array.isArray(value) ? [...new Set(value.filter((id) => typeof id === 'string' && id))] : [])
 
 export function WishlistProvider({ children }) {
   const [ids, setIds] = useState(() => sanitize(readStorage(STORAGE_KEYS.wishlist, [])))
@@ -34,10 +35,9 @@ export function WishlistProvider({ children }) {
     [ids],
   )
 
-  const value = useMemo(
-    () => ({ ids, items: ids.map((id) => PRODUCTS_BY_ID[id]).filter(Boolean), count: ids.length, has, toggle, remove }),
-    [ids, has, toggle, remove],
-  )
+  const catalog = useCatalog()
+  const items = useMemo(() => ids.map((id) => catalog.byId[id]).filter(Boolean), [ids, catalog])
+  const value = useMemo(() => ({ ids, items, count: items.length, has, toggle, remove }), [ids, items, has, toggle, remove])
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>
 }
 

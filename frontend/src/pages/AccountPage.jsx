@@ -2,16 +2,17 @@ import { Link } from 'react-router-dom'
 import { Heart, Info, Package, ShoppingBag } from 'lucide-react'
 import { useCart } from '../context/CartContext.jsx'
 import { useWishlist } from '../context/WishlistContext.jsx'
-import { readStorage, STORAGE_KEYS } from '../lib/storage.js'
 import { formatPrice } from '../lib/format.js'
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js'
+import { useStore } from '../store/hooks.js'
 import '../styles/pages.css'
 
 export default function AccountPage() {
   useDocumentTitle('Account')
   const { count } = useCart()
   const wishlist = useWishlist()
-  const lastOrder = readStorage(STORAGE_KEYS.lastOrder, null)
+  // Most recent demo order placed in this browser (sample orders added in the Admin are excluded).
+  const lastOrder = useStore().orders.find((o) => !o.sample) ?? null
 
   return (
     <div className="container page account">

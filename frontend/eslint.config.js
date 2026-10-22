@@ -22,7 +22,7 @@ export default [
   },
   {
     // Context modules intentionally export their provider together with its hook.
-    files: ['src/context/**/*.jsx', 'src/components/product/QuickAdd.jsx'],
+    files: ['src/context/**/*.jsx', 'src/components/product/QuickAdd.jsx', 'src/admin/**/*Context.jsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
 ]

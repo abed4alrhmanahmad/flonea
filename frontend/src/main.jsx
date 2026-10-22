@@ -10,6 +10,7 @@ import App from './App.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { CartProvider } from './context/CartContext.jsx'
 import { WishlistProvider } from './context/WishlistContext.jsx'
+import { SetBuilderProvider } from './context/SetBuilderContext.jsx'
 import { QuickAddProvider } from './components/product/QuickAdd.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -18,9 +19,11 @@ createRoot(document.getElementById('root')).render(
       <ToastProvider>
         <CartProvider>
           <WishlistProvider>
-            <QuickAddProvider>
-              <App />
-            </QuickAddProvider>
+            <SetBuilderProvider>
+              <QuickAddProvider>
+                <App />
+              </QuickAddProvider>
+            </SetBuilderProvider>
           </WishlistProvider>
         </CartProvider>
       </ToastProvider>

@@ -1,40 +1,88 @@
 import { COLORS, MATERIALS, SIZES, CATEGORIES, PILLOW_SIZE_FOR_BED } from '../data/catalog.js'
 
-export const LOW_STOCK_THRESHOLD = 4
-const DIMENSIONS = ['material', 'color', 'size']
+export const DEFAULT_LOW_STOCK_THRESHOLD = 4
+export const DIMENSIONS = ['material', 'color', 'size']
+/** Product field that lists each dimension's options. */
+export const OPTION_FIELDS = { material: 'materials', color: 'colors', size: 'sizes' }
+/** Shared presets, used as a fallback label for ids a product no longer defines. */
+export const OPTION_LIBRARIES = { material: MATERIALS, color: COLORS, size: SIZES }
 
 export const variantKey = ({ material, color, size }) => `${material}|${color}|${size}`
+export const parseVariantKey = (key) => {
+  const [material, color, size] = String(key).split('|')
+  return { material, color, size }
+}
 export const roundMoney = (n) => Math.round(n * 100) / 100
 
-const matchesRule = (rule, variant) => Object.entries(rule).every(([k, v]) => variant[k] === v)
-const bySizeOrder = (a, b) => (SIZES[a]?.order ?? 99) - (SIZES[b]?.order ?? 99)
+export const matchesRule = (rule, variant) => Object.entries(rule).every(([k, v]) => variant[k] === v)
 const unique = (arr) => [...new Set(arr)]
+const isNumber = (n) => typeof n === 'number' && Number.isFinite(n)
+const enabledOptions = (list) => (list ?? []).filter((o) => o.enabled !== false)
 
-/** Expands a simple (non-set) product into its concrete variants. */
-function expandSimpleProduct(product) {
-  const variants = []
-  const { pricing, unavailable = [], stock = {} } = product
-  for (const material of product.materials) {
-    for (const color of product.colors) {
-      for (const size of product.sizes) {
-        const v = { material, color, size }
-        if (unavailable.some((rule) => matchesRule(rule, v))) continue
-        const sizePrice = pricing.sizes[size]
-        if (sizePrice == null) continue
-        const price = roundMoney(sizePrice + (pricing.materials?.[material] ?? 0))
-        const override = stock.overrides?.find((o) => matchesRule(o.match, v))
-        variants.push({
-          ...v,
-          key: variantKey(v),
-          sku: `${product.id}-${material}-${color}-${size}`.toUpperCase(),
-          price,
-          compareAtPrice: null,
-          stock: override ? override.qty : (stock.default ?? 10),
+/**
+ * Editable product model (what the Admin edits and the store persists) — see src/store/seed.js.
+ * Each product owns its options:
+ *   materials [{ id, name, short, description, surcharge, enabled }]
+ *   colors    [{ id, name, hex, enabled }]
+ *   sizes     [{ id, name, dims, price, enabled }]
+ * plus `unavailable` partial-match rules (combinations that are not produced), `variantSettings`
+ * keyed by variant key ({ available?, stock?, price? }) and `defaultStock` for combinations without
+ * an explicit stock level.
+ */
+
+/**
+ * Every combination of a simple product's ENABLED options — including those that are not sold:
+ *   restricted  removed by one of the product's `unavailable` rules (not produced)
+ *   offered     false when the combination is restricted or switched off for this variant
+ * Disabled options produce no combinations at all.
+ */
+export function listCombinations(product) {
+  const settingsByKey = product.variantSettings ?? {}
+  const rules = product.unavailable ?? []
+  const result = []
+  for (const m of enabledOptions(product.materials)) {
+    for (const c of enabledOptions(product.colors)) {
+      for (const s of enabledOptions(product.sizes)) {
+        const selection = { material: m.id, color: c.id, size: s.id }
+        const key = variantKey(selection)
+        const settings = settingsByKey[key] ?? {}
+        const restricted = rules.some((rule) => matchesRule(rule, selection))
+        const basePrice = roundMoney((Number(s.price) || 0) + (Number(m.surcharge) || 0))
+        const priceOverride = isNumber(settings.price) ? roundMoney(settings.price) : null
+        result.push({
+          ...selection,
+          key,
+          restricted,
+          offered: !restricted && settings.available !== false,
+          basePrice,
+          priceOverride,
+          price: priceOverride ?? basePrice,
+          stock: isNumber(settings.stock) ? settings.stock : (product.defaultStock ?? 10),
+          stockOverride: isNumber(settings.stock),
         })
       }
     }
   }
-  return variants
+  return result
+}
+
+export const variantSku = (product, { material, color, size }) =>
+  `${product.skuPrefix || product.id}-${material}-${color}-${size}`.toUpperCase()
+
+/** Expands a simple (non-set) product into the variants a customer can choose. */
+function expandSimpleProduct(product) {
+  return listCombinations(product)
+    .filter((c) => c.offered)
+    .map(({ material, color, size, key, price, stock }) => ({
+      material,
+      color,
+      size,
+      key,
+      sku: variantSku(product, { material, color, size }),
+      price,
+      compareAtPrice: null,
+      stock,
+    }))
 }
 
 /**
@@ -53,7 +101,7 @@ export function resolveComponentSelection(componentProduct, selection) {
 }
 
 /**
- * Builds the variants of a bundle from its components.
+ * Builds the variants of a ready-made bundle from its components.
  * A bundle variant exists only when every component variant exists. Its price is the sum of
  * component prices × quantity minus `discountPercent`, and its stock is limited by the scarcest component.
  */
@@ -90,16 +138,38 @@ export function expandBundle({ components, discountPercent = 0, candidates }, pr
   return variants
 }
 
-function finalizeProduct(product, variants) {
-  const order = (list, dimension) => unique(list.filter((value) => variants.some((v) => v[dimension] === value)))
-  const availableMaterials = order(product.materials, 'material')
-  const availableColors = order(product.colors, 'color')
-  const availableSizes = order(product.sizes, 'size').sort(bySizeOrder)
+/** Per-product option lookup: { material: { id: option }, color: {…}, size: {…} } with each option's position. */
+function buildOptionInfo(product) {
+  const info = {}
+  for (const dim of DIMENSIONS) {
+    info[dim] = Object.fromEntries((product[OPTION_FIELDS[dim]] ?? []).map((o, order) => [o.id, { ...o, order }]))
+  }
+  return info
+}
+
+const EMPTY_OPTION_INFO = { material: {}, color: {}, size: {} }
+
+function finalizeProduct(product, variants, optionInfo) {
+  // Options keep the product's own order (sizes as arranged in the Admin, which defaults to small → large).
+  const ordered = (dim) =>
+    unique(
+      Object.values(optionInfo[dim])
+        .sort((a, b) => a.order - b.order)
+        .map((o) => o.id)
+        .filter((id) => variants.some((v) => v[dim] === id)),
+    )
+  const availableMaterials = ordered('material')
+  const availableColors = ordered('color')
+  const availableSizes = ordered('size')
   const prices = variants.map((v) => v.price)
   const category = CATEGORIES.find((c) => c.id === product.category)
+  const status = product.status ?? 'active'
+  const name = (dim, id) => optionInfo[dim][id]?.name ?? OPTION_LIBRARIES[dim][id]?.name
   return {
     ...product,
+    status,
     isBundle: Boolean(product.bundle),
+    optionInfo,
     materials: availableMaterials,
     colors: availableColors,
     sizes: availableSizes,
@@ -109,38 +179,81 @@ function finalizeProduct(product, variants) {
     variants,
     variantsByKey: Object.fromEntries(variants.map((v) => [v.key, v])),
     inventory: Object.fromEntries(variants.map((v) => [v.key, v.stock])),
-    priceRange: { min: Math.min(...prices), max: Math.max(...prices) },
+    priceRange: prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : { min: 0, max: 0 },
+    // Customers can only see and buy active products that have at least one variant.
+    isPurchasable: status === 'active' && variants.length > 0,
     categoryName: category?.name ?? product.category,
     searchText: [
       product.name,
       product.tagline,
       category?.name,
-      ...availableMaterials.map((m) => MATERIALS[m]?.name),
-      ...availableColors.map((c) => COLORS[c]?.name),
+      ...availableMaterials.map((m) => name('material', m)),
+      ...availableColors.map((c) => name('color', c)),
     ]
+      .filter(Boolean)
       .join(' ')
       .toLowerCase(),
   }
 }
 
-/** Processes raw product definitions into the catalog used by the app. */
-export function buildCatalog(rawProducts) {
+const buildSimple = (product) => finalizeProduct(product, expandSimpleProduct(product), buildOptionInfo(product))
+
+function buildBundle(product, productsById) {
+  const components = product.bundle.components ?? []
+  const lead = productsById[components[0]?.productId]
+  // A ready-made set is only sold while every product it contains is itself active.
+  const usable = lead && components.every((c) => productsById[c.productId]?.status === 'active' && !productsById[c.productId].isBundle)
+  if (!usable) return finalizeProduct(product, [], lead?.optionInfo ?? EMPTY_OPTION_INFO)
+  const candidates = { materials: lead.materials, colors: lead.colors, sizes: lead.sizes }
+  return finalizeProduct(product, expandBundle({ ...product.bundle, candidates }, productsById), lead.optionInfo)
+}
+
+/** Processes one editable product. Bundles need the processed simple products they contain. */
+export const buildProduct = (product, productsById) => (product.bundle ? buildBundle(product, productsById) : buildSimple(product))
+
+/** Processes editable product definitions (any status) into the catalog used by the app. */
+export function buildCatalog(products) {
   const byId = {}
-  for (const raw of rawProducts.filter((p) => !p.bundle)) {
-    byId[raw.id] = finalizeProduct(raw, expandSimpleProduct(raw))
+  for (const p of products.filter((p) => !p.bundle)) byId[p.id] = buildSimple(p)
+  for (const p of products.filter((p) => p.bundle)) byId[p.id] = buildBundle(p, byId)
+  return products.map((p) => byId[p.id])
+}
+
+/**
+ * Cross-product option index for shop filters: shared presets first (so filter labels stay
+ * consistent), then any option a product defined itself under a new id.
+ */
+export function buildOptionIndex(products) {
+  const index = {}
+  for (const dim of DIMENSIONS) {
+    index[dim] = Object.fromEntries(Object.entries(OPTION_LIBRARIES[dim]).map(([id, o]) => [id, { ...o, order: o.order ?? 0 }]))
+    for (const p of products) {
+      for (const id of p[OPTION_FIELDS[dim]]) {
+        if (!index[dim][id]) index[dim][id] = { ...p.optionInfo[dim][id], order: 100 + (p.optionInfo[dim][id]?.order ?? 0) }
+      }
+    }
   }
-  for (const raw of rawProducts.filter((p) => p.bundle)) {
-    const lead = byId[raw.bundle.components[0].productId]
-    const candidates = { materials: lead.materials, colors: lead.colors, sizes: lead.sizes }
-    const variants = expandBundle({ ...raw.bundle, candidates }, byId)
-    byId[raw.id] = finalizeProduct({ ...raw, ...candidates }, variants)
-  }
-  return rawProducts.map((p) => byId[p.id])
+  return index
+}
+
+// ─── Option labels ───────────────────────────────────────────────────────────
+
+/** A product's own definition of an option, falling back to the shared preset. */
+export function getOptionInfo(product, dimension, id) {
+  if (id == null) return null
+  return product?.optionInfo?.[dimension]?.[id] ?? OPTION_LIBRARIES[dimension]?.[id] ?? { id, name: id }
+}
+
+/** Short display label: material short name, colour name or size name. */
+export function optionLabel(product, dimension, id) {
+  const option = getOptionInfo(product, dimension, id)
+  if (!option) return undefined
+  return dimension === 'material' ? option.short || option.name : option.name
 }
 
 // ─── Selection helpers (product page, set builder) ──────────────────────────
 
-export const findVariant = (product, selection) => product.variantsByKey[variantKey(selection)] ?? null
+export const findVariant = (product, selection) => (selection ? (product.variantsByKey[variantKey(selection)] ?? null) : null)
 
 /** True if any variant has `dimension = value` while keeping the other selected options. */
 export function isOptionCompatible(product, dimension, value, selection) {
@@ -181,17 +294,18 @@ export function changeSelection(product, selection, dimension, value) {
   return { selection: chosen, adjusted: DIMENSIONS.filter((d) => d !== dimension && chosen[d] !== selection[d]) }
 }
 
-/** Human readable availability for a variant. */
-export function getAvailability(variant) {
+/** Human readable availability for a variant. `threshold` is the store's low-stock threshold. */
+export function getAvailability(variant, threshold = DEFAULT_LOW_STOCK_THRESHOLD) {
   if (!variant) return { state: 'unavailable', label: 'Not available in this combination' }
   if (variant.stock <= 0) return { state: 'out', label: 'Sold out in this option' }
-  if (variant.stock <= LOW_STOCK_THRESHOLD) return { state: 'low', label: `Only ${variant.stock} left` }
+  if (variant.stock <= threshold) return { state: 'low', label: `Only ${variant.stock} left` }
   return { state: 'in', label: 'In stock — ships in 1–2 business days' }
 }
 
 /** Gallery image keys for a product in a given colour. */
 export const getProductImageKeys = (product, color) =>
-  (color && product.colorImages?.[color]) || product.images
+  (color && product.colorImages?.[color]?.length ? product.colorImages[color] : null) || product.images
 
-export const describeSelection = ({ material, color, size }) =>
-  [SIZES[size]?.name, MATERIALS[material]?.short, COLORS[color]?.name].filter(Boolean)
+/** ["Queen", "Linen", "White"] for a product's selection. */
+export const describeSelection = (product, { material, color, size }) =>
+  [optionLabel(product, 'size', size), optionLabel(product, 'material', material), optionLabel(product, 'color', color)].filter(Boolean)

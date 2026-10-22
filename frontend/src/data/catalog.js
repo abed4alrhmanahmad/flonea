@@ -1,6 +1,10 @@
 /**
- * Shared option definitions used by every product in the catalog.
- * Products reference these by id (e.g. `materials: ['organic-cotton', 'linen']`).
+ * Shared option libraries and store defaults.
+ *
+ * MATERIALS, COLORS and SIZES are presets: the seed products in ./products.js reference them by id,
+ * and the Admin offers them when adding an option. Once loaded, every product keeps its OWN copy of
+ * its sizes, colours and materials (see src/store/seed.js), so editing one product's options never
+ * changes another product. COLLECTIONS and SHIPPING are the defaults the store starts from.
  */
 
 export const CATEGORIES = [
@@ -11,8 +15,9 @@ export const CATEGORIES = [
 ]
 
 /**
- * Collections group categories for the /collections/:id pages.
- * The "Pillows" collection includes pillow inserts and pillowcases.
+ * Default collections for the /collections/:id pages. The store turns `categories` into an explicit,
+ * ordered product list that the Admin can edit. The "Pillows" collection includes pillow inserts and
+ * pillowcases.
  */
 export const COLLECTIONS = {
   'duvet-covers': {
@@ -116,8 +121,8 @@ export const SIZES = {
 }
 
 /**
- * Compatibility rule for sets: pillowcases and pillows are sized to match the bed (duvet) size.
- * Used by pre-made bedding sets and by the Bedding Set Builder.
+ * Compatibility rule for pre-made bedding sets: pillowcases and pillows are sized to match the bed (duvet) size.
+ * (Custom sets from the Set Builder let each component keep its own size.)
  */
 export const PILLOW_SIZE_FOR_BED = {
   single: 'standard',
@@ -127,15 +132,15 @@ export const PILLOW_SIZE_FOR_BED = {
   'super-king': 'king-pillow',
 }
 
-/** Price-range buckets used by the shop filters. */
+/** Price-range buckets used by the shop filters (labels are formatted in the display currency, see formatPriceBucket). */
 export const PRICE_RANGES = [
-  { id: '0-50', label: 'Under $50', min: 0, max: 50 },
-  { id: '50-100', label: '$50 – $100', min: 50, max: 100 },
-  { id: '100-150', label: '$100 – $150', min: 100, max: 150 },
-  { id: '150+', label: '$150 & above', min: 150, max: Infinity },
+  { id: '0-50', min: 0, max: 50 },
+  { id: '50-100', min: 50, max: 100 },
+  { id: '100-150', min: 100, max: 150 },
+  { id: '150+', min: 150, max: Infinity },
 ]
 
-/** Demo shipping rules — shared by cart and checkout. */
+/** Default demo shipping rules (editable in Admin → Settings) — shared by cart and checkout. */
 export const SHIPPING = {
   freeThreshold: 100,
   methods: [
@@ -146,3 +151,13 @@ export const SHIPPING = {
 }
 
 export const MAX_LINE_QUANTITY = 10
+
+/** Currencies the storefront can DISPLAY prices in. Display only — amounts are never converted. */
+export const CURRENCIES = [
+  { code: 'USD', label: 'US Dollar' },
+  { code: 'EUR', label: 'Euro' },
+  { code: 'GBP', label: 'British Pound' },
+  { code: 'AED', label: 'UAE Dirham' },
+  { code: 'SAR', label: 'Saudi Riyal' },
+  { code: 'LBP', label: 'Lebanese Pound' },
+]

@@ -3,8 +3,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Img from '../ui/Img.jsx'
 import { getImage } from '../../data/images.js'
 
-/** Main image + thumbnails (desktop: vertical rail, mobile: swipeable with dots). */
-export default function ProductGallery({ images, productName }) {
+/**
+ * Main image + thumbnails (desktop: vertical rail, mobile: swipeable with dots).
+ * `alts` maps an image key/URL to the alt text set for it in the Admin.
+ */
+export default function ProductGallery({ images, productName, alts = {} }) {
   const [state, setState] = useState({ images, index: 0 })
   const touchX = useRef(null)
 
@@ -46,7 +49,7 @@ export default function ProductGallery({ images, productName }) {
         <Img
           key={images[index]}
           name={images[index]}
-          alt={`${productName} — ${getImage(images[index]).alt}`}
+          alt={alts[images[index]] || [productName, getImage(images[index]).alt].filter(Boolean).join(' — ')}
           ratio="1 / 1"
           sizes="(max-width: 900px) 100vw, 55vw"
           priority

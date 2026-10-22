@@ -1,62 +1,61 @@
 /**
- * Bedding Set Builder configuration.
+ * Build a Set configuration.
  *
- * The builder combines items from the Signature line, which share materials and colours.
- * Compatibility comes from the catalog itself: a combination is only offered when every
- * selected item exists in that material / colour / size (see resolveComponentSelection).
+ * A custom bedding set is one Pillows & Pillowcases product plus one duvet cover. Each component
+ * keeps its own product, size, material, colour and quantity — nothing is forced to match — and
+ * the set is priced at the sum of its components' regular catalog prices (no set discount).
  *
- * Discount rule (Full Set mode only): a duvet cover + at least one pillowcase set
- * qualifies for `discountPercent` off every item in the set. Individual Items mode is full price.
+ * Every product in a role's categories counts as one self-contained component: a product from the
+ * Pillows & Pillowcases collection is never split into a separate pillow and pillowcase, and no
+ * extra pillowcase product is added to represent it.
+ *
+ * Fixed here: role ids, labels and which categories fill each role. Editable in Admin → Build a Set:
+ * each role's hint and the pillow quantity limit (read live from the store), plus which products
+ * are eligible (`setEligible` on each product).
  */
-export const SET_BUILDER = {
-  items: [
-    {
-      id: 'duvet',
-      productId: 'signature-duvet-cover',
-      label: 'Duvet Cover',
-      note: 'Sized to your bed',
-      min: 0,
-      max: 1,
-      defaultQuantity: 1,
-    },
-    {
-      id: 'pillowcases',
-      productId: 'signature-pillowcase-set',
-      label: 'Pillowcase Set (2 pcs)',
-      note: 'Standard for Single–Queen, King for King–Super King',
-      min: 0,
-      max: 2,
-      defaultQuantity: 1,
-    },
-    {
-      id: 'pillows',
-      productId: 'cloud-pillow',
-      label: 'Cloud Pillow',
-      note: 'White only · sized to match your pillowcases',
-      min: 0,
-      max: 4,
-      defaultQuantity: 0,
-    },
-  ],
-  /** Maximum pillowcase sets / pillows that make sense per bed size. */
-  maxPerBedSize: {
-    pillowcases: { single: 1, double: 2, queen: 2, king: 2, 'super-king': 2 },
-    pillows: { single: 2, double: 4, queen: 4, king: 4, 'super-king': 4 },
-  },
-  fullSet: {
-    discountPercent: 10,
-    requiredItems: ['duvet', 'pillowcases'],
-    label: 'Full Set saving',
-  },
-}
+import { getStoreData } from '../store/store.js'
 
-/** True when a set of builder components qualifies for the Full Set discount. */
-export function qualifiesForSetDiscount(components) {
-  return SET_BUILDER.fullSet.requiredItems.every((itemId) => {
-    const item = SET_BUILDER.items.find((i) => i.id === itemId)
-    return components.some((c) => c.productId === item.productId && c.quantity > 0)
-  })
-}
+const roleSettings = (id) => getStoreData().setBuilder.roles[id]
 
-export const getBuilderDiscountPercent = (components) =>
-  qualifiesForSetDiscount(components) ? SET_BUILDER.fullSet.discountPercent : 0
+export const SET_ROLES = [
+  {
+    id: 'pillow',
+    label: 'Pillows & Pillowcases',
+    unit: ['Pillow Product', 'Pillow Products'],
+    collectionId: 'pillows',
+    categories: ['pillows', 'pillowcases'],
+    get maxQuantity() {
+      return roleSettings('pillow').maxQuantity
+    },
+    missingMessage: 'Add a Pillows & Pillowcases product to your set.',
+    get hint() {
+      return roleSettings('pillow').hint
+    },
+    shopLabel: 'Shop Pillows',
+  },
+  {
+    id: 'duvet',
+    label: 'Duvet Cover',
+    unit: ['Duvet Cover', 'Duvet Covers'],
+    collectionId: 'duvet-covers',
+    categories: ['duvet-covers'],
+    get maxQuantity() {
+      return roleSettings('duvet').maxQuantity // one duvet cover per bed
+    },
+    missingMessage: 'Add a duvet cover to your set.',
+    get hint() {
+      return roleSettings('duvet').hint
+    },
+    shopLabel: 'Shop Duvet Covers',
+  },
+]
+
+export const SET_ROLES_BY_ID = Object.fromEntries(SET_ROLES.map((r) => [r.id, r]))
+
+/** Query parameter that puts collection and product pages into Build a Set mode. */
+export const SET_MODE_PARAM = 'mode'
+export const SET_MODE_VALUE = 'set'
+
+export const BUILDER_PATH = '/bedding-sets/builder'
+export const collectionPathFor = (role, setMode = true) =>
+  `/collections/${role.collectionId}${setMode ? `?${SET_MODE_PARAM}=${SET_MODE_VALUE}` : ''}`

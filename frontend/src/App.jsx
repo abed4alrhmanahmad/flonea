@@ -1,7 +1,11 @@
-import { lazy } from 'react'
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/layout/Layout.jsx'
+import { PageLoader } from './components/ui/EmptyState.jsx'
 import HomePage from './pages/HomePage.jsx'
+
+// The whole Admin (login, dashboard, editors) is a separate lazy chunk, so the storefront doesn't load it.
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 
 const ShopPage = lazy(() => import('./pages/ShopPage.jsx'))
 const ProductPage = lazy(() => import('./pages/ProductPage.jsx'))
@@ -17,6 +21,14 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 export default function App() {
   return (
     <Routes>
+      <Route
+        path="admin/*"
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <AdminApp />
+          </Suspense>
+        }
+      />
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="shop" element={<ShopPage />} />

@@ -19,3 +19,8 @@
   .upsell { grid-template-columns: 56px 1fr; }
   .upsell .btn { grid-column: 1 / -1; }
 }
+
+/* Lines that can't be bought right now (withdrawn, inactive or sold out) */
+.cart-unavailable { display: flex; gap: 0.6rem; align-items: flex-start; margin: 0 0 var(--space-5); padding: 0.75rem 1rem; background: var(--warning-bg); border-left: 3px solid var(--champagne); border-radius: var(--radius); font-size: var(--fs-sm); color: var(--warning); }
+.cart-unavailable svg { flex: none; margin-top: 3px; }
+.cart-unavailable p { margin: 0 0 0.25rem; color: var(--text-body); }

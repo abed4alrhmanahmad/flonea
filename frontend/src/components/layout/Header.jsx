@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Heart, Menu, Search, ShoppingBag, User } from 'lucide-react'
-import { NAV_LINKS } from '../../data/content.js'
 import { useCart } from '../../context/CartContext.jsx'
+import { useContent } from '../../store/hooks.js'
+import { safePath } from '../../lib/links.js'
 import { useWishlist } from '../../context/WishlistContext.jsx'
 import Drawer from '../ui/Drawer.jsx'
 import SearchDialog from './SearchDialog.jsx'
@@ -15,6 +16,9 @@ export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
+  const { navigation } = useContent()
+  const links = navigation.links.filter((l) => l.enabled && l.label.trim()).map((l) => ({ ...l, to: safePath(l.to) }))
+  const buildSet = navigation.showBuildSet && navigation.buildSetLabel.trim()
 
   // Close the mobile menu when the route changes.
   const [lastPath, setLastPath] = useState(location.pathname)
@@ -41,18 +45,20 @@ export default function Header() {
 
         <nav className="header__nav" aria-label="Main">
           <ul role="list">
-            {NAV_LINKS.map((l) => (
-              <li key={l.to}>
-                <NavLink to={l.to} end={l.end} className="header__link">
+            {links.map((l) => (
+              <li key={l.id}>
+                <NavLink to={l.to} end={l.to === '/'} className="header__link">
                   {l.label}
                 </NavLink>
               </li>
             ))}
-            <li>
-              <NavLink to="/bedding-sets/builder" className="header__link header__link--accent">
-                Build a Set
-              </NavLink>
-            </li>
+            {buildSet && (
+              <li>
+                <NavLink to="/bedding-sets/builder" className="header__link header__link--accent">
+                  {navigation.buildSetLabel}
+                </NavLink>
+              </li>
+            )}
           </ul>
         </nav>
 
@@ -84,18 +90,20 @@ export default function Header() {
       >
         <nav aria-label="Mobile">
           <ul role="list" className="mobile-menu__list">
-            {NAV_LINKS.map((l) => (
-              <li key={l.to}>
-                <NavLink to={l.to} end={l.end} className="mobile-menu__link">
+            {links.map((l) => (
+              <li key={l.id}>
+                <NavLink to={l.to} end={l.to === '/'} className="mobile-menu__link">
                   {l.label}
                 </NavLink>
               </li>
             ))}
-            <li>
-              <NavLink to="/bedding-sets/builder" className="mobile-menu__link mobile-menu__link--accent">
-                Build a Set
-              </NavLink>
-            </li>
+            {buildSet && (
+              <li>
+                <NavLink to="/bedding-sets/builder" className="mobile-menu__link mobile-menu__link--accent">
+                  {navigation.buildSetLabel}
+                </NavLink>
+              </li>
+            )}
           </ul>
           <ul role="list" className="mobile-menu__secondary">
             <li><Link to="/wishlist">Wishlist ({wishlist.count})</Link></li>
